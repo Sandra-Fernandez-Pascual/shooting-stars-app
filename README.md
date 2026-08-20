@@ -60,13 +60,13 @@ pip install -r requirements.txt
 
 ### 2. API key
 
-Copy `.env.sample` to `.env` and add your xAI key:
+Copy `.streamlit/secrets.toml.example` to `.streamlit/secrets.toml` and add your xAI key:
 
-```
-XAI_API_KEY=xai-your-key-here
+```toml
+XAI_API_KEY = "xai-your-key-here"
 ```
 
-Get a key at [console.x.ai](https://console.x.ai/). The viewing forecast still works without a key; only chat needs it.
+`.streamlit/secrets.toml` is gitignored. Get a key at [console.x.ai](https://console.x.ai/). The viewing forecast still works without a key; only chat needs it.
 
 ### 3. Run the app
 
@@ -87,11 +87,11 @@ shooting-stars-app/
   ai/prompts.py          # system prompt, result text, practical tips
   ai/tools.py            # weather, astronomy, visibility, scoring
   ai/utils.py            # geocoding, sky quality, dates, nearby places
-  ai/theme.py            # starry UI and soundtrack
+  ai/theme.py            # starry UI
   ai/meteor_schema.py    # load showers.json
   data/showers.json      # major showers
   .streamlit/config.toml # theme colors
-  .env.sample
+  .streamlit/secrets.toml.example  # sample for local secrets
   requirements.txt
   README.md
 ```

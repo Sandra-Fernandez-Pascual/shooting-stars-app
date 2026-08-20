@@ -5,12 +5,11 @@ viewing time. Grok only explains those numbers in the chat below.
 """
 
 import streamlit as st
-from dotenv import load_dotenv
 from html import escape
 
 from ai.agent import agent
 from ai.prompts import SYSTEM_PROMPT, format_practical_tips, format_results_context
-from ai.theme import BOT_AVATAR, USER_AVATAR, apply_starry_theme, soundtrack_player
+from ai.theme import BOT_AVATAR, USER_AVATAR, apply_starry_theme
 from ai.tools import run_pipeline
 from ai.utils import (
     CITY_PART_HELP,
@@ -19,8 +18,6 @@ from ai.utils import (
     SKY_QUALITY_OPTIONS,
     forecast_dates,
 )
-
-load_dotenv()
 
 st.set_page_config(
     page_title="Shooting Stars Bot",
@@ -32,7 +29,6 @@ apply_starry_theme()
 
 st.title("Shooting Stars Bot")
 st.caption("A little night-sky companion. Find the best hour, then get cozy.")
-soundtrack_player()
 
 if "results" not in st.session_state:
     st.session_state["results"] = None

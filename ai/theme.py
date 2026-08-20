@@ -1,14 +1,10 @@
-"""Starry UI: colors, chat avatars, and the official Coldplay player."""
+"""Starry UI: colors and chat avatars."""
 
 import streamlit as st
 import streamlit.components.v1 as components
 
 BOT_AVATAR = "✨"
 USER_AVATAR = "🌙"
-
-# Official Coldplay video on YouTube — not a copied audio file.
-# Loop + a sticky parent-page player: Streamlit reruns kill in-page embeds.
-YOUTUBE_VIDEO = "VPRjCeoBqrI"
 
 STARRY_CSS = """
 <style>
@@ -29,7 +25,7 @@ header[data-testid="stHeader"] {
 
 .block-container {
   padding-top: 1.4rem;
-  padding-bottom: 7rem;
+  padding-bottom: 3rem;
   max-width: 46rem;
 }
 
@@ -178,13 +174,6 @@ div[data-testid="stMetric"] {
   border: 1px solid rgba(155, 180, 255, 0.12);
 }
 
-.soundtrack-label {
-  font-family: "Cormorant Garamond", serif;
-  font-size: 1.15rem;
-  color: #e8c547;
-  margin-bottom: 0.15rem;
-}
-
 @media (prefers-color-scheme: light) {
   .stApp, [data-testid="stAppViewContainer"] {
     background:
@@ -256,9 +245,6 @@ div[data-testid="stMetric"] {
   .sky-metric-value {
     color: #152047 !important;
   }
-  .soundtrack-label {
-    color: #6b4e00;
-  }
 }
 
 @media (max-width: 640px) {
@@ -319,117 +305,24 @@ def apply_starry_theme():
         + '<div class="shooting-star"></div></div>',
         unsafe_allow_html=True,
     )
-
-
-def soundtrack_player():
-    """Official YouTube player that stays put, loops, and starts itself.
-
-    Browsers block sound until the page is used. The first click or key
-    anywhere on the app starts the song; Streamlit reruns do not stop it.
-    """
-    components.html(_soundtrack_bootstrap(), height=1)
-
-
-def _soundtrack_bootstrap():
-    """Mount a looping player on the parent page and start it on first use."""
-    html = r"""
+    components.html(
+        """
 <script>
 (function () {
   var doc = window.parent && window.parent.document
     ? window.parent.document
     : document;
-  var old = doc.getElementById("sky-soundtrack");
-  if (old && old.getAttribute("data-sky") === "v4") {
-    return;
+  var ids = ["sky-soundtrack", "sky-soundtrack-style", "sky-player-boot"];
+  var i;
+  for (i = 0; i < ids.length; i++) {
+    var el = doc.getElementById(ids[i]);
+    if (el) {
+      el.remove();
+    }
   }
-  if (old) {
-    old.remove();
-  }
-
-  var style = doc.getElementById("sky-soundtrack-style");
-  if (!style) {
-    style = doc.createElement("style");
-    style.id = "sky-soundtrack-style";
-    doc.head.appendChild(style);
-  }
-  style.textContent = [
-    "#sky-soundtrack {",
-    "  position: fixed; right: 1rem; bottom: 1rem; z-index: 2147483000;",
-    "  width: 300px; padding: 0.7rem 0.75rem 0.8rem;",
-    "  background: rgba(11, 16, 38, 0.96);",
-    "  border: 1px solid rgba(232, 197, 71, 0.45);",
-    "  border-radius: 16px;",
-    "  box-shadow: 0 10px 30px rgba(5, 8, 20, 0.45);",
-    "  font-family: Outfit, sans-serif; color: #e8eefc;",
-    "}",
-    "#sky-soundtrack .sky-copy { font-size: 0.86rem; line-height: 1.35; margin-top: 0.55rem; }",
-    "#sky-soundtrack .sky-copy strong {",
-    "  display: block; font-family: 'Cormorant Garamond', serif;",
-    "  font-size: 1.08rem; color: #e8c547; margin-bottom: 0.2rem;",
-    "}",
-    "#sky-soundtrack #sky-yt-host, #sky-soundtrack iframe {",
-    "  width: 100%; height: 169px; border: 0; border-radius: 10px;",
-    "  background: #000; display: block;",
-    "}",
-    "@media (max-width: 640px) {",
-    "  #sky-soundtrack { left: 0.6rem; right: 0.6rem; bottom: 0.6rem; width: auto; }",
-    "}"
-  ].join(" ");
-
-  var bar = doc.createElement("div");
-  bar.id = "sky-soundtrack";
-  bar.setAttribute("data-sky", "v4");
-  bar.innerHTML =
-    '<div id="sky-yt-host"></div>'
-    + '<div class="sky-copy"><strong>A sky full of stars is waiting for you</strong>'
-    + "Let yourself go with the music while planning your dreamy night away.</div>";
-  doc.body.appendChild(bar);
-
-  if (doc.getElementById("sky-player-boot")) {
-    return;
-  }
-  var boot = doc.createElement("script");
-  boot.id = "sky-player-boot";
-  boot.textContent = [
-    "(function(){",
-    "  var videoId = 'VIDEO_ID';",
-    "  function tryPlay() {",
-    "    try {",
-    "      if (window.skyPlayer && window.skyPlayer.playVideo) {",
-    "        window.skyPlayer.unMute();",
-    "        window.skyPlayer.playVideo();",
-    "      }",
-    "    } catch (err) {}",
-    "  }",
-    "  function startPlayer() {",
-    "    if (!window.YT || !window.YT.Player) { return; }",
-    "    if (window.skyPlayer) { tryPlay(); return; }",
-    "    window.skyPlayer = new window.YT.Player('sky-yt-host', {",
-    "      height: '169', width: '300', videoId: videoId,",
-    "      playerVars: { autoplay: 1, mute: 0, loop: 1, playlist: videoId,",
-    "        rel: 0, modestbranding: 1, playsinline: 1 },",
-    "      events: {",
-    "        onReady: function(e) { e.target.unMute(); e.target.playVideo(); },",
-    "        onStateChange: function(e) {",
-    "          if (e.data === window.YT.PlayerState.ENDED) { e.target.playVideo(); }",
-    "        }",
-    "      }",
-    "    });",
-    "  }",
-    "  document.addEventListener('pointerdown', tryPlay, true);",
-    "  document.addEventListener('keydown', tryPlay, true);",
-    "  window.onYouTubeIframeAPIReady = startPlayer;",
-    "  if (window.YT && window.YT.Player) { startPlayer(); }",
-    "  else {",
-    "    var tag = document.createElement('script');",
-    "    tag.src = 'https://www.youtube.com/iframe_api';",
-    "    document.head.appendChild(tag);",
-    "  }",
-    "})();"
-  ].join("");
-  doc.body.appendChild(boot);
 })();
 </script>
-"""
-    return html.replace("VIDEO_ID", YOUTUBE_VIDEO)
+        """,
+        height=1,
+    )
 

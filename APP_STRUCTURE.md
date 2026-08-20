@@ -10,8 +10,8 @@ Run it with `streamlit run app.py`.
 shooting-stars-app/
   app.py                      Streamlit UI: form, results, chat
   requirements.txt
-  .env.sample                 XAI_API_KEY only
   .streamlit/config.toml      Default navy/gold theme
+  .streamlit/secrets.toml.example  Sample XAI_API_KEY for local secrets
   data/showers.json           Local meteor-shower catalog
   ai/
     __init__.py
@@ -20,14 +20,14 @@ shooting-stars-app/
     meteor_schema.py          Load and match showers
     prompts.py                System prompt, Grok context, practical tips
     agent.py                  One call to grok-3-mini
-    theme.py                  Starry CSS, avatars, soundtrack
+    theme.py                  Starry CSS and chat avatars
 ```
 
-Secrets stay in `.env` (gitignored). Streamlit Cloud uses Secrets instead.
+Local secrets live in `.streamlit/secrets.toml` (gitignored). Streamlit Cloud uses the same TOML in the Secrets dashboard. The app reads them with `st.secrets`.
 
 ## What the user sees
 
-1. **Title and soundtrack** — starry theme, Coldplay player in the corner.
+1. **Title** — starry theme and a short welcome.
 2. **Form** — city, preferred date (next 14 days), sky quality, optional city side (big cities only).
 3. **Viewing forecast** — location, date, shower, best window, meteor range, score.
 4. **Two other nights** — next-best nights at the same place.
@@ -58,7 +58,7 @@ flowchart LR
 | `ai/meteor_schema.py` | Which shower is active on a date |
 | `ai/prompts.py` | What Grok may say; packing list from weather |
 | `ai/agent.py` | Chat completion only — no tools |
-| `ai/theme.py` | Look and soundtrack |
+| `ai/theme.py` | Look and chat avatars |
 
 ## Session state
 
@@ -96,7 +96,6 @@ Nearby “forests” that are tiny urban plantings (for example Tiny Forest) are
 | Open-Meteo forecast | Hourly cloud, visibility, temperature, wind, rain, humidity |
 | OpenStreetMap Nominatim / Overpass | Named reserves, parks, forests, villages |
 | xAI (`https://api.x.ai/v1`) | Chat only |
-| YouTube embed | Official *A Sky Full of Stars* player |
 
 There is no database.
 

@@ -4,12 +4,8 @@ This module does not call weather or astronomy tools. Python already
 calculated the results; they are included in the system message.
 """
 
-import os
-
-from dotenv import load_dotenv
+import streamlit as st
 from openai import OpenAI
-
-load_dotenv()
 
 
 def agent(messages):
@@ -22,7 +18,10 @@ def agent(messages):
     Returns:
         str: Grok's reply, or an error sentence if the API key is missing.
     """
-    api_key = os.environ.get("XAI_API_KEY")
+    try:
+        api_key = st.secrets.get("XAI_API_KEY")
+    except st.errors.StreamlitSecretNotFoundError:
+        api_key = None
     if not api_key:
         return (
             "I cannot chat right now because XAI_API_KEY is missing. "

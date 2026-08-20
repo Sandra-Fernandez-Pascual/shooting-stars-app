@@ -5,6 +5,6 @@ Modules:
 - utils: city lookup, sky quality, dates, nearby dark sites
 - tools: weather, astronomy, visibility, scoring
 - prompts: Grok instructions, result context, practical tips
-- theme: starry UI and soundtrack player
+- theme: starry UI and chat avatars
 - agent: send a chat message to Grok
 """
