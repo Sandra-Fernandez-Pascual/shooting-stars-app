@@ -65,6 +65,6 @@ shooting-stars-app/
   README.md
 ```
 
-Code style: functions, dictionaries, and pandas. No custom classes.
+Code style: functions, dictionaries and pandas. 
 
  
