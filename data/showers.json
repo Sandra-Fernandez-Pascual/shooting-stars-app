@@ -1,0 +1,145 @@
+[
+  {
+    "name": "Quadrantids",
+    "active_start": "12-28",
+    "active_end": "01-12",
+    "peak_date": "01-03",
+    "radiant_ra_deg": 230.0,
+    "radiant_dec_deg": 49.5,
+    "zhr_peak": 110,
+    "population_index_r": 2.1,
+    "sigma_days": 1.0
+  },
+  {
+    "name": "Lyrids",
+    "active_start": "04-16",
+    "active_end": "04-25",
+    "peak_date": "04-22",
+    "radiant_ra_deg": 272.0,
+    "radiant_dec_deg": 33.0,
+    "zhr_peak": 18,
+    "population_index_r": 2.1,
+    "sigma_days": 1.5
+  },
+  {
+    "name": "eta Aquariids",
+    "active_start": "04-19",
+    "active_end": "05-28",
+    "peak_date": "05-06",
+    "radiant_ra_deg": 338.0,
+    "radiant_dec_deg": -1.0,
+    "zhr_peak": 50,
+    "population_index_r": 2.4,
+    "sigma_days": 4.0
+  },
+  {
+    "name": "alpha Capricornids",
+    "active_start": "07-03",
+    "active_end": "08-15",
+    "peak_date": "07-30",
+    "radiant_ra_deg": 307.0,
+    "radiant_dec_deg": -10.0,
+    "zhr_peak": 5,
+    "population_index_r": 2.5,
+    "sigma_days": 5.0
+  },
+  {
+    "name": "Southern Delta Aquariids",
+    "active_start": "07-12",
+    "active_end": "08-23",
+    "peak_date": "07-30",
+    "radiant_ra_deg": 340.0,
+    "radiant_dec_deg": -16.0,
+    "zhr_peak": 25,
+    "population_index_r": 3.0,
+    "sigma_days": 5.0
+  },
+  {
+    "name": "Perseids",
+    "active_start": "07-17",
+    "active_end": "08-24",
+    "peak_date": "08-12",
+    "radiant_ra_deg": 48.2,
+    "radiant_dec_deg": 57.9,
+    "zhr_peak": 100,
+    "population_index_r": 2.2,
+    "sigma_days": 5.0
+  },
+  {
+    "name": "Draconids",
+    "active_start": "10-06",
+    "active_end": "10-10",
+    "peak_date": "10-08",
+    "radiant_ra_deg": 262.0,
+    "radiant_dec_deg": 54.0,
+    "zhr_peak": 10,
+    "population_index_r": 2.6,
+    "sigma_days": 0.8
+  },
+  {
+    "name": "Orionids",
+    "active_start": "10-02",
+    "active_end": "11-07",
+    "peak_date": "10-21",
+    "radiant_ra_deg": 95.3,
+    "radiant_dec_deg": 15.8,
+    "zhr_peak": 20,
+    "population_index_r": 2.5,
+    "sigma_days": 3.0
+  },
+  {
+    "name": "Southern Taurids",
+    "active_start": "09-10",
+    "active_end": "11-20",
+    "peak_date": "11-05",
+    "radiant_ra_deg": 52.0,
+    "radiant_dec_deg": 15.0,
+    "zhr_peak": 5,
+    "population_index_r": 2.5,
+    "sigma_days": 10.0
+  },
+  {
+    "name": "Northern Taurids",
+    "active_start": "10-20",
+    "active_end": "12-10",
+    "peak_date": "11-12",
+    "radiant_ra_deg": 58.0,
+    "radiant_dec_deg": 22.0,
+    "zhr_peak": 5,
+    "population_index_r": 2.5,
+    "sigma_days": 10.0
+  },
+  {
+    "name": "Leonids",
+    "active_start": "11-06",
+    "active_end": "11-30",
+    "peak_date": "11-17",
+    "radiant_ra_deg": 152.0,
+    "radiant_dec_deg": 21.8,
+    "zhr_peak": 15,
+    "population_index_r": 2.5,
+    "sigma_days": 1.5
+  },
+  {
+    "name": "Geminids",
+    "active_start": "12-04",
+    "active_end": "12-17",
+    "peak_date": "12-14",
+    "radiant_ra_deg": 112.0,
+    "radiant_dec_deg": 33.2,
+    "zhr_peak": 120,
+    "population_index_r": 2.6,
+    "sigma_days": 2.0
+  },
+  {
+    "name": "Ursids",
+    "active_start": "12-17",
+    "active_end": "12-26",
+    "peak_date": "12-22",
+    "radiant_ra_deg": 217.0,
+    "radiant_dec_deg": 75.8,
+    "zhr_peak": 10,
+    "population_index_r": 3.0,
+    "sigma_days": 1.0
+  }
+]

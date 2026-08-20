@@ -1,23 +1,303 @@
-import os
-from openai import OpenAI
+"""Shooting Stars Bot — Streamlit app.
+
+The user picks a city, a date, and sky quality. Python estimates the best
+viewing time. Grok only explains those numbers in the chat below.
+"""
+
 import streamlit as st
 from dotenv import load_dotenv
+from html import escape
+
+from ai.agent import agent
+from ai.prompts import SYSTEM_PROMPT, format_practical_tips, format_results_context
+from ai.theme import BOT_AVATAR, USER_AVATAR, apply_starry_theme, soundtrack_player
+from ai.tools import run_pipeline
+from ai.utils import (
+    CITY_PART_HELP,
+    CITY_PART_OPTIONS,
+    SKY_QUALITY_HELP,
+    SKY_QUALITY_OPTIONS,
+    forecast_dates,
+)
 
 load_dotenv()
 
-st.title("💬 Chatbot")
-st.caption("🚀 A Streamlit chatbot powered by Grok")
+st.set_page_config(
+    page_title="Shooting Stars Bot",
+    page_icon="✨",
+    layout="centered",
+    initial_sidebar_state="collapsed",
+)
+apply_starry_theme()
+
+st.title("Shooting Stars Bot")
+st.caption("A little night-sky companion. Find the best hour, then get cozy.")
+soundtrack_player()
+
+if "results" not in st.session_state:
+    st.session_state["results"] = None
 if "messages" not in st.session_state:
-    st.session_state["messages"] = [{"role": "assistant", "content": "How can I help you?"}]
+    st.session_state["messages"] = []
 
-for msg in st.session_state.messages:
-    st.chat_message(msg["role"]).write(msg["content"])
+dates = forecast_dates()
+min_date = dates[0]
+max_date = dates[-1]
 
-if prompt := st.chat_input():
-    client = OpenAI(api_key=os.environ["XAI_API_KEY"], base_url="https://api.x.ai/v1")
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    st.chat_message("user").write(prompt)
-    response = client.chat.completions.create(model="grok-3-mini", messages=st.session_state.messages)
-    msg = response.choices[0].message.content
-    st.session_state.messages.append({"role": "assistant", "content": msg})
-    st.chat_message("assistant").write(msg)
+city = st.text_input("City", placeholder="Berlin")
+selected_date = st.date_input(
+    "Preferred date",
+    value=min_date,
+    min_value=min_date,
+    max_value=max_date,
+)
+sky_quality = st.selectbox(
+    "Where will you watch from?",
+    SKY_QUALITY_OPTIONS,
+    index=2,
+    help=SKY_QUALITY_HELP,
+)
+city_part = st.selectbox(
+    "If this is a big city, which side are you on?",
+    CITY_PART_OPTIONS,
+    index=0,
+    help=CITY_PART_HELP,
+)
+
+if st.button("Find best viewing time", type="primary"):
+    if not city or city.strip() == "":
+        st.error("Please enter a city.")
+    else:
+        with st.spinner("Calculating the viewing forecast..."):
+            results = run_pipeline(
+                city.strip(), selected_date, sky_quality, city_part
+            )
+
+        if not results.get("ok"):
+            error = results.get("error")
+            if error == "city_not_found":
+                st.error("City not found. Try a different spelling or a nearby city.")
+            elif error == "weather_timeout":
+                st.warning("Could not download the weather forecast. Please try again.")
+            elif error == "no_night_hours":
+                place = results.get("resolved_location", city)
+                st.info(
+                    "Almost no astronomical night hours at "
+                    + str(place)
+                    + " on this date (the Sun never gets 18 degrees below the horizon). "
+                    "Try another date or city."
+                )
+            else:
+                st.error("Something went wrong. Please try again.")
+            st.session_state["results"] = None
+            st.session_state["messages"] = []
+        else:
+            st.session_state["results"] = results
+            context = format_results_context(results)
+            greeting = (
+                "The sky is booked. You just have to show up a little "
+                "curious, a little bundled, and ready for a streak of light. "
+                "If you want a hand getting cozy, those sparkles above "
+                "are already waiting. ✨"
+            )
+            st.session_state["messages"] = [
+                {"role": "system", "content": SYSTEM_PROMPT + "\n\n" + context},
+                {"role": "assistant", "content": greeting},
+            ]
+
+results = st.session_state.get("results")
+
+if results and results.get("ok"):
+    st.subheader("Viewing forecast")
+    st.write("**Location:** " + results["resolved_location"])
+    st.write("**Date:** " + results["selected_date_label"])
+    st.write("**Watching from:** " + results["sky_quality"])
+    if results.get("large_city"):
+        st.caption(
+            "This forecast uses the "
+            + str(results.get("city_part"))
+            + " of the city."
+        )
+    else:
+        st.caption("This looks like a smaller town, so the town centre was used.")
+
+    if results["shower"]:
+        st.write("**Meteor shower:** " + results["shower"])
+    else:
+        st.info("No major meteor shower is active on this date.")
+
+    st.markdown(
+        '<div class="sky-metrics">'
+        + '<div class="sky-metric"><p class="sky-metric-label">Best viewing time</p>'
+        + '<p class="sky-metric-value">'
+        + escape(str(results["best_window_local"] or "—"))
+        + "</p></div>"
+        + '<div class="sky-metric"><p class="sky-metric-label">Estimated visible meteors</p>'
+        + '<p class="sky-metric-value">'
+        + escape(str(results["expected_meteors_display"]))
+        + "</p></div>"
+        + '<div class="sky-metric"><p class="sky-metric-label">Score</p>'
+        + '<p class="sky-metric-value">'
+        + escape(str(results["score"]) + "/100")
+        + "</p></div></div>",
+        unsafe_allow_html=True,
+    )
+
+    st.caption(results["score_explanation"])
+
+    other_nights = results.get("other_nights") or []
+    if other_nights:
+        st.subheader("Two other nights")
+        if results.get("score") == 100:
+            st.caption(
+                "Your date is already the strongest of the next 14 days. "
+                "These are the next-best nights at the same place."
+            )
+        for item in other_nights:
+            shower_bit = item["shower"] or "no major shower"
+            window_bit = item["window_local"] or "—"
+            st.write(
+                "**"
+                + item["date_label"]
+                + ":** "
+                + window_bit
+                + ", about "
+                + item["expected_meteors_display"]
+                + " meteors ("
+                + shower_bit
+                + "), score "
+                + str(item["score"])
+                + "/100."
+            )
+
+    close = results.get("close_location_recommendation")
+    if close:
+        window_bit = ""
+        if close.get("window_local"):
+            window_bit = ", " + str(close["window_local"])
+        sector_bit = ""
+        if close.get("sector"):
+            sector_bit = ", " + str(close["sector"])
+        st.markdown(
+            '<div class="near-you"><strong>Near you</strong> · '
+            + escape(str(close["name"]))
+            + " ("
+            + str(close["distance_km"])
+            + " km"
+            + escape(sector_bit)
+            + escape(window_bit)
+            + ", about "
+            + escape(str(close["expected_meteors_display"]))
+            + " meteors on "
+            + escape(str(close["date_label"]))
+            + ").</div>",
+            unsafe_allow_html=True,
+        )
+        if close.get("maps_url"):
+            st.markdown("[Open map](" + close["maps_url"] + ")")
+
+    around = results.get("around_city_recommendations") or []
+    if around:
+        st.subheader("Other sides of the city")
+        st.caption(
+            "Darker spots on other sides of "
+            + results["resolved_location"]
+            + "."
+        )
+        sides = []
+        names = []
+        distances = []
+        windows = []
+        meteors = []
+        for item in around:
+            sides.append(item.get("sector") or "—")
+            names.append(item["name"])
+            distances.append(str(item["distance_km"]) + " km")
+            windows.append(item.get("window_local") or "—")
+            meteors.append(item["expected_meteors_display"])
+        st.dataframe(
+            {
+                "Side": sides,
+                "Place": names,
+                "From you": distances,
+                "Window": windows,
+                "Meteors": meteors,
+            },
+            hide_index=True,
+        )
+
+    no_shower = results.get("no_shower_recommendation")
+    if no_shower and not results["shower"]:
+        st.info(
+            "Closest night with a shower: "
+            + no_shower["date_label"]
+            + " ("
+            + str(no_shower["shower"])
+            + ", "
+            + str(no_shower["window_local"])
+            + ", about "
+            + no_shower["expected_meteors_display"]
+            + " meteors)."
+        )
+
+    pending = st.session_state.pop("pending_chat", None)
+    if pending:
+        st.session_state["messages"].append(
+            {"role": "user", "content": pending}
+        )
+        if pending == "Practical tips for a memorable night":
+            reply = format_practical_tips(results.get("comfort_conditions"))
+        else:
+            reply = agent(st.session_state["messages"])
+        st.session_state["messages"].append(
+            {"role": "assistant", "content": reply}
+        )
+
+    has_user_chat = False
+    for msg in st.session_state["messages"]:
+        if msg["role"] == "user":
+            has_user_chat = True
+            break
+
+    with st.expander("✨ Ask about this forecast", expanded=has_user_chat):
+        st.markdown(
+            "Your midnight picnic menu: **how cold** it will get "
+            "(and **what to wear** so you last until the good streak), "
+            "whether the **wind** will make itself known, "
+            "a **rain** check, or **practical tips for a memorable night**. "
+            "Pick a sparkle. 🌟"
+        )
+        row1a, row1b = st.columns(2)
+        if row1a.button("✨ How cold? What to wear?"):
+            st.session_state["pending_chat"] = (
+                "How cold will it be in the viewing window, and what should I wear?"
+            )
+            st.rerun()
+        if row1b.button("🌟 Will it be windy?"):
+            st.session_state["pending_chat"] = (
+                "Will it be windy during the viewing window?"
+            )
+            st.rerun()
+        row2a, row2b = st.columns(2)
+        if row2a.button("⭐ Will it rain?"):
+            st.session_state["pending_chat"] = (
+                "Will it rain during the viewing window? Should I take a waterproof layer?"
+            )
+            st.rerun()
+        if row2b.button("🌠 Practical tips for a memorable night"):
+            st.session_state["pending_chat"] = (
+                "Practical tips for a memorable night"
+            )
+            st.rerun()
+
+        for msg in st.session_state["messages"]:
+            if msg["role"] == "system":
+                continue
+            avatar = BOT_AVATAR
+            if msg["role"] == "user":
+                avatar = USER_AVATAR
+            st.chat_message(msg["role"], avatar=avatar).write(msg["content"])
+
+        prompt = st.chat_input("✨ How cold? What to wear? Practical tips?")
+        if prompt:
+            st.session_state["pending_chat"] = prompt
+            st.rerun()

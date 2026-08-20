@@ -1,38 +1,40 @@
-import json
+"""Send the chat history to Grok and return the text reply.
+
+This module does not call weather or astronomy tools. Python already
+calculated the results; they are included in the system message.
+"""
+
 import os
+
 from dotenv import load_dotenv
 from openai import OpenAI
-from ai.tools import get_data_df_local, get_data_df_cloud
-from ai.tools import TOOLS
-
 
 load_dotenv()
 
+
 def agent(messages):
+    """Ask Grok to reply to the conversation.
+
+    Args:
+        messages (list): OpenAI-style dicts with role and content.
+            The first message should be the system prompt plus results.
+
+    Returns:
+        str: Grok's reply, or an error sentence if the API key is missing.
+    """
+    api_key = os.environ.get("XAI_API_KEY")
+    if not api_key:
+        return (
+            "I cannot chat right now because XAI_API_KEY is missing. "
+            "The viewing results above are still valid."
+        )
 
     client = OpenAI(
-        api_key=os.environ["XAI_API_KEY"],
+        api_key=api_key,
         base_url="https://api.x.ai/v1",
     )
-
     completion = client.chat.completions.create(
         model="grok-3-mini",
-        tools=TOOLS, # here we pass the tools to the LLM
         messages=messages,
     )
-
-    # Get the response from the LLM
-    response = completion.choices[0].message
-
-    # Parse the response to get the tool call arguments
-    if response.tool_calls:
-        # Process each tool call
-        for tool_call in response.tool_calls:
-            # Get the tool call arguments
-            tool_call_arguments = json.loads(tool_call.function.arguments)
-            if tool_call.function.name == "get_data_df":
-                return get_data_df_cloud(tool_call_arguments["sql_query"])
-                #return get_data_df_local(tool_call_arguments["sql_query"])
-    else:
-        # If there are no tool calls, return the response content
-        return response.content
+    return completion.choices[0].message.content

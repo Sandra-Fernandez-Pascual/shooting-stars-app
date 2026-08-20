@@ -1,247 +1,120 @@
-# 🤖 Sakila Data AI Agent 📊
+# Shooting Stars Bot
 
-A powerful AI-powered chatbot that helps you analyze and query the Sakila database (a sample MySQL database representing a DVD rental store) using natural language. Built with OpenAI's GPT-4o-mini model, Python, and Streamlit.
+An English-language Streamlit app that answers: **when should I go outside to watch shooting stars from this city?**
 
-## 🌟 Features
+You pick a city, a date in the next 14 days, and how dark your sky is. In a big city you can also say which side you are on. Python estimates the best viewing window. Grok only explains those numbers in a chat about clothing and comfort.
 
-- 🗣️ **Natural Language Querying**: Ask questions in plain English and get SQL-powered answers
-- 🤖 **AI-Powered Agent**: Uses OpenAI's GPT-4o-mini with function calling capabilities
-- 🎨 **Interactive UI**: Beautiful, modern chat interface built with Streamlit
-- 🔍 **Query Transparency**: See the generated SQL queries in expandable sections
-- 📊 **Data Visualization**: Results displayed as interactive pandas DataFrames
-- 🌐 **Flexible Database Support**: Works with both local MySQL and cloud PostgreSQL databases
-- 🧠 **Schema-Aware**: Complete Sakila database schema embedded in the AI's context
-- 🔧 **Tool Calling**: Advanced implementation using OpenAI's function calling API
+## Features
 
-## 🛠️ Prerequisites
+- City lookup and 14-day hourly weather from Open-Meteo
+- Astronomical night only (Sun more than 18 degrees below the horizon)
+- Local meteor-shower catalog in `data/showers.json`
+- Visible meteor estimate, then the best 1–3 hour block
+- Score from 0–100 compared with the other nights in the forecast
+- Two other nights, a nearby darker place, and other sides of a big city
+- Chat for how cold it will feel, wind, rain, and practical tips for that window
+- Grok chat (`grok-3-mini`) that must not invent numbers
 
-- **Python 3.8+**
-- **Database Options:**
-  - Local: MySQL with Sakila database installed, OR
-  - Cloud: PostgreSQL database (e.g., Neon, AWS RDS, Google Cloud SQL)
-- **OpenAI API key** (get one at [platform.openai.com](https://platform.openai.com))
-- **Required Python packages** (see Installation section)
+## How the estimate works
 
-## 📦 Installation & Setup
+Python looks at every astronomical-night hour:
 
-### 1. Fork & Clone the Repository
+`R_h = ZHR_h * sin(radiant_altitude) * r^(LM_h - 6.5) * (1 - cloud_cover / 100)`
+
+- **ZHR** is shower activity (Gaussian around the peak date)
+- **Radiant** is the point meteors appear to come from
+- **LM** is sky darkness (your sky-quality choice plus moonlight)
+- **Cloud cover** comes from the forecast
+
+The recommended time is the three consecutive hours with the highest sum of `R_h`.
+
+The score is:
+
+`score = 100 * this_window / best_window_in_the_14_days`
+
+The best night in the forecast gets 100.
+
+Where you will watch from (brighter places hide more meteors):
+
+- Countryside → Bortle 2, LM about 7.0
+- Village or suburb → Bortle 4, LM about 6.0
+- Residential street → Bortle 6, LM about 5.0
+- City centre → Bortle 8, LM about 4.0
+
+A **viewing night** runs from local noon on the selected date to local noon the next day. So 02:00–05:00 on 13 August still belongs to the night of 12 August.
+
+## Setup
+
+### 1. Clone and install
 
 ```bash
-git clone https://github.com/yourusername/sakila-data-ai-agent.git
-cd sakila-data-ai-agent
-```
+cd shooting-stars-app
+python -m venv .venv
+# Windows:
+.venv\Scripts\activate
+# macOS / Linux:
+source .venv/bin/activate
 
-### 2. Install Required Packages
-
-```bash
 pip install -r requirements.txt
 ```
 
-Or install core packages directly:
-```bash
-pip install openai streamlit pymysql sqlalchemy python-dotenv pandas "psycopg[binary]"
+### 2. API key
+
+Copy `.env.sample` to `.env` and add your xAI key:
+
+```
+XAI_API_KEY=xai-your-key-here
 ```
 
-### 3. Set Up Your Database
+Get a key at [console.x.ai](https://console.x.ai/). The viewing forecast still works without a key; only chat needs it.
 
-#### Option A: Local MySQL Database
+### 3. Run the app
 
-1. Install MySQL if you haven't already
-2. Import the Sakila database using the SQL scripts provided:
-
-```bash
-# Run scripts in order:
-mysql -u root -p < sakila-sql-scripts/sakila_schema_00_create_schema.sql
-mysql -u root -p < sakila-sql-scripts/sakila_data_01_base_data.sql
-mysql -u root -p < sakila-sql-scripts/sakila_data_02_location_data.sql
-mysql -u root -p < sakila-sql-scripts/sakila_data_03_film_data.sql
-mysql -u root -p < sakila-sql-scripts/sakila_data_04_staff_store_customer.sql
-mysql -u root -p < sakila-sql-scripts/sakila_data_05a_rental_data_part1.sql
-mysql -u root -p < sakila-sql-scripts/sakila_data_05b_rental_data_part2.sql
-mysql -u root -p < sakila-sql-scripts/sakila_data_06a_payment_data_part1.sql
-mysql -u root -p < sakila-sql-scripts/sakila_data_06b_payment_data_part2.sql
-```
-
-#### Option B: Cloud Database
-
-See `Cloud_DB_Guide.ipynb` for detailed instructions on setting up a cloud PostgreSQL database with the Sakila data.
-
-### 4. Configure Environment Variables
-
-Create a `.env` file in the project root:
-
-```bash
-# OpenAI API Configuration
-OPENAI_API_KEY=your_api_key_here
-
-# Local MySQL Configuration (if using local database)
-DB_HOST=localhost
-DB_USER=root
-DB_PASSWORD=your_database_password
-DB_NAME=sakila
-DB_PORT=3306
-
-# Cloud PostgreSQL Configuration (if using cloud database)
-POSTGRES_HOST=your_cloud_host
-POSTGRES_USER=your_username
-POSTGRES_PASSWORD=your_password
-POSTGRES_DB=sakila
-POSTGRES_PORT=5432
-```
-
-## 🚀 Usage
-
-### Start the Application
-
-```bash
-streamlit run app_solution.py
-```
-
-Or if you're building from scratch:
 ```bash
 streamlit run app.py
 ```
 
-### Using the Chatbot
+Open the URL Streamlit prints (usually `http://localhost:8501`).
 
-1. Open your web browser to the provided local URL (typically `http://localhost:8501`)
-2. Start asking questions about the Sakila database in natural language
-3. View the AI's responses along with the generated SQL queries
-4. Explore the data displayed in interactive tables
+The first forecast can take about 30–60 seconds while Python computes Sun, Moon, and radiant positions for each night hour. Streamlit shows a spinner during that time.
 
-## 💡 Example Queries
-
-Here are some questions you can ask:
-
-**Basic Queries:**
-- "How many movies are in the database?"
-- "Show me all the actors"
-- "What are all the film categories?"
-
-**Complex Analytics:**
-- "What are the top 10 most rented movies?"
-- "Show me the top 5 customers by total rental count"
-- "What's the average rental duration by film category?"
-- "Which stores have the highest revenue?"
-
-**Business Insights:**
-- "Who are the most profitable customers?"
-- "What are the most popular film categories by rental count?"
-- "Show me monthly revenue trends"
-- "Which actors appear in the most films?"
-
-## 🗄️ Project Structure
+## Project layout
 
 ```
-sakila-data-ai-agent/
-├── ai/                              # AI agent modules
-│   ├── agent.py                     # Core agent implementation with tool calling
-│   ├── tools.py                     # Database querying tools (local & cloud)
-│   ├── prompts.py                   # System prompts with schema information
-│   ├── sakila_schema.py             # Complete Sakila database schema
-│   └── utils.py                     # Database connection utilities
-├── sakila-sql-scripts/              # SQL scripts for database setup
-│   ├── sakila_schema_00_create_schema.sql
-│   ├── sakila_data_01_base_data.sql
-│   ├── sakila_data_02_location_data.sql
-│   ├── sakila_data_03_film_data.sql
-│   ├── sakila_data_04_staff_store_customer.sql
-│   ├── sakila_data_05a_rental_data_part1.sql
-│   ├── sakila_data_05b_rental_data_part2.sql
-│   ├── sakila_data_06a_payment_data_part1.sql
-│   └── sakila_data_06b_payment_data_part2.sql
-├── app.py                           # Starter template (build your own)
-├── app_solution.py                  # Complete reference implementation
-├── Developer_Guide.ipynb            # Comprehensive tutorial notebook
-├── Cloud_DB_Guide.ipynb             # Cloud database setup guide
-├── Structured_Output_Guide.ipynb   # Advanced: Using structured outputs
-├── requirements.txt                 # Python package dependencies
-├── .env                             # Environment variables (create this)
-└── README.md                        # This file
+shooting-stars-app/
+  app.py                 # Streamlit app
+  ai/agent.py            # Grok chat only
+  ai/prompts.py          # system prompt, result text, practical tips
+  ai/tools.py            # weather, astronomy, visibility, scoring
+  ai/utils.py            # geocoding, sky quality, dates, nearby places
+  ai/theme.py            # starry UI and soundtrack
+  ai/meteor_schema.py    # load showers.json
+  data/showers.json      # major showers
+  .streamlit/config.toml # theme colors
+  .env.sample
+  requirements.txt
+  README.md
 ```
 
-## 🔧 Technical Details
+Code style: functions, dictionaries, and pandas. No custom classes.
 
-### Architecture
+## Deploy on Streamlit Community Cloud
 
-The project implements a modern AI agent architecture using:
+1. Push this repo to GitHub
+2. At [share.streamlit.io](https://share.streamlit.io), create an app
+3. Main file: `app.py`
+4. In **Secrets**, add:
 
-1. **OpenAI Function Calling**: The agent uses GPT-4o-mini with function calling to determine when to query the database
-2. **Tool Implementation**: Custom Python functions that execute SQL queries and return formatted results
-3. **Schema-Aware Prompting**: The complete Sakila database schema is embedded in the system prompt
-4. **Stateful Conversation**: Streamlit session state maintains conversation history
-5. **Dynamic SQL Generation**: The LLM generates SQL queries based on natural language input
+```
+XAI_API_KEY = "xai-your-key-here"
+```
 
-### Key Technologies
+No database secrets are needed.
 
-- **OpenAI API (GPT-4o-mini)**: Natural language understanding and SQL generation
-- **Streamlit**: Interactive web application framework
-- **SQLAlchemy**: Database ORM and connection management
-- **PyMySQL**: MySQL database adapter
-- **Psycopg**: PostgreSQL database adapter
-- **Pandas**: Data manipulation and display
-- **Python-dotenv**: Environment variable management
+## Known limits
 
-### How It Works
-
-1. User enters a natural language question in the chat interface
-2. The message is sent to GPT-4o-mini along with the conversation history and database schema
-3. The AI determines if a database query is needed and generates the appropriate SQL
-4. The `get_data_df` tool executes the SQL query against the database
-5. Results are formatted as a pandas DataFrame and displayed to the user
-6. The AI provides a natural language response based on the data
-
-## 📚 Learning Resources
-
-This repository is designed as a comprehensive learning resource for building AI-powered data agents:
-
-### 1. Developer Guide (`Developer_Guide.ipynb`)
-
-A step-by-step Jupyter notebook that teaches you how to build the entire application:
-- Setting up the OpenAI API and understanding API parameters
-- Creating effective system prompts with database schemas
-- Implementing function calling and tool use
-- Building database connection utilities
-- Developing the Streamlit chat interface
-- Managing conversation state and history
-
-### 2. Cloud Database Guide (`Cloud_DB_Guide.ipynb`)
-
-Learn how to:
-- Set up a cloud PostgreSQL database (Neon, AWS, GCP)
-- Migrate the Sakila schema to PostgreSQL
-- Import data into your cloud database
-- Configure secure connections
-- Modify the agent to work with cloud databases
-
-### 3. Structured Output Guide (`Structured_Output_Guide.ipynb`)
-
-Advanced topics including:
-- Using OpenAI's structured output feature
-- Implementing Pydantic models for response validation
-- Type-safe AI responses
-- Advanced prompt engineering techniques
-
-### 4. Development Process
-
-- Start with `app.py` - it's intentionally minimal for you to build up
-- Follow the Developer Guide step by step
-- Reference `app_solution.py` only after attempting to build it yourself
-- Experiment with different prompts and queries
-- Try extending the agent with additional tools and capabilities
-
-### 5. Learning Goals
-
-By working through this project, you'll learn:
-- ✅ How to integrate OpenAI's API into Python applications
-- ✅ Implementing AI function calling for tool use
-- ✅ Building conversational AI agents
-- ✅ Natural language to SQL query generation
-- ✅ Database connectivity and query execution
-- ✅ Creating interactive web applications with Streamlit
-- ✅ Managing application state and conversation history
-- ✅ Best practices for AI prompt engineering
-
-## 📝 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
+- Radiant coordinates are a peak-night approximation
+- Cloud cover 14 days ahead is only a forecast
+- Grok must stay inside the numbers Python calculated
+- Near the poles, some dates have almost no astronomical night
+- Nearby places come from OpenStreetMap; small urban plantings are skipped
