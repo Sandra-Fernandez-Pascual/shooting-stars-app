@@ -2,11 +2,11 @@
 
 A little night-sky companion that finds the best hour to watch shooting stars from where you are — then helps you get cozy for the show.
 
-🔗 **Live App:** [https://northern-lights-forecast.streamlit.app  ](https://shooting-stars.streamlit.app/)
+🔗 **Live App:** https://shooting-stars.streamlit.app/
 
 🎤 **Final Presentation:** 
 
-📋 **Project Planning:** [https://trello.com/b/Q96iavWk/northern-lights-final-project-ironhack](https://trello.com/b/hWIYxGgN/shooting-stars-bot)
+📋 **Project Planning:** https://trello.com/b/hWIYxGgN/shooting-stars-bot
 
 ## Features
 
