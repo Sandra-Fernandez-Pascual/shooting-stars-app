@@ -1,12 +1,12 @@
 # How the agent works
 
-Grok does **not** look up weather, showers, or maps. Python does that first. The agent only reads a system message that already contains the numbers, then writes a short English reply.
+Python looks up weather, showers, or maps.  Then the agent reads a system message that already contains the numbers, then writes a short reply.
 
 The model is **grok-3-mini** via the OpenAI-compatible xAI API (`ai/agent.py`).
 
 ## Rule
 
-`ai/tools.py` calculates. `ai/agent.py` only talks. There is no Grok tool-calling.
+`ai/tools.py` calculates. `ai/agent.py` only talks. 
 
 ## End-to-end flow
 
@@ -80,13 +80,11 @@ All prompt text lives in `ai/prompts.py`.
 
 ### System prompt (`SYSTEM_PROMPT`)
 
-Tells Grok it is a friendly English helper, then:
+Tells Grok it is a friendly helper, then:
 
-- Do not repeat the forecast, times, other nights, or other places.
-- Do not suggest another date, time, or location.
-- Extra help only: temperature, wind, rain, humidity, what to wear, practical tips.
+- Extra help: temperature, wind, rain, humidity, what to wear, practical tips.
 - Use **WINDOW CONDITIONS** for weather; never invent numbers.
-- If they ask for practical tips, use **PRACTICAL TIPS FOR A MEMORABLE NIGHT** exactly.
+- If they ask for practical tips, use **PRACTICAL TIPS FOR A MEMORABLE NIGHT**.
 - Weather answers: usually 2–4 short sentences.
 
 ### Practical tips (Python)
@@ -140,14 +138,6 @@ Grok never receives raw weather DataFrames or `showers.json`. It only sees this 
 | Practical tips for a memorable night | Python packing list, no Grok |
 
 Typed questions in the chat box go to Grok, except the exact practical-tips sentence above.
-
-## What Grok must not do
-
-- Invent temperatures, wind, rain, or meteor counts
-- Repeat the results tables
-- Offer another night or another place (those are already on the page)
-
-The forecast still works without an API key. Only chat needs `XAI_API_KEY`.
 
 ## Related doc
 
