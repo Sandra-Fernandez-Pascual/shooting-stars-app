@@ -43,41 +43,6 @@ Where you will watch from (brighter places hide more meteors):
 
 A **viewing night** runs from local noon on the selected date to local noon the next day. So 02:00–05:00 on 13 August still belongs to the night of 12 August.
 
-## Setup
-
-### 1. Clone and install
-
-```bash
-cd shooting-stars-app
-python -m venv .venv
-# Windows:
-.venv\Scripts\activate
-# macOS / Linux:
-source .venv/bin/activate
-
-pip install -r requirements.txt
-```
-
-### 2. API key
-
-Copy `.streamlit/secrets.toml.example` to `.streamlit/secrets.toml` and add your xAI key:
-
-```toml
-XAI_API_KEY = "xai-your-key-here"
-```
-
-`.streamlit/secrets.toml` is gitignored. Get a key at [console.x.ai](https://console.x.ai/). The viewing forecast still works without a key; only chat needs it.
-
-### 3. Run the app
-
-```bash
-streamlit run app.py
-```
-
-Open the URL Streamlit prints (usually `http://localhost:8501`).
-
-The first forecast can take about 30–60 seconds while Python computes Sun, Moon, and radiant positions for each night hour. Streamlit shows a spinner during that time.
-
 ## Project layout
 
 ```
@@ -98,23 +63,4 @@ shooting-stars-app/
 
 Code style: functions, dictionaries, and pandas. No custom classes.
 
-## Deploy on Streamlit Community Cloud
-
-1. Push this repo to GitHub
-2. At [share.streamlit.io](https://share.streamlit.io), create an app
-3. Main file: `app.py`
-4. In **Secrets**, add:
-
-```
-XAI_API_KEY = "xai-your-key-here"
-```
-
-No database secrets are needed.
-
-## Known limits
-
-- Radiant coordinates are a peak-night approximation
-- Cloud cover 14 days ahead is only a forecast
-- Grok must stay inside the numbers Python calculated
-- Near the poles, some dates have almost no astronomical night
-- Nearby places come from OpenStreetMap; small urban plantings are skipped
+ 
