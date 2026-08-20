@@ -1,8 +1,10 @@
 # Shooting Stars Bot
 
-An English-language Streamlit app that answers: **when should I go outside to watch shooting stars from this city?**
+A little night-sky companion that finds the best hour to watch shooting stars from where you are — then helps you get cozy for the show.
 
-You pick a city, a date in the next 14 days, and how dark your sky is. In a big city you can also say which side you are on. Python estimates the best viewing window. Grok only explains those numbers in a chat about clothing and comfort.
+🔗 **Live App:** [https://northern-lights-forecast.streamlit.app  ](https://shooting-stars.streamlit.app/)
+🎤 **Final Presentation:** 
+📋 **Project Planning:** [https://trello.com/b/Q96iavWk/northern-lights-final-project-ironhack](https://trello.com/b/hWIYxGgN/shooting-stars-bot)
 
 ## Features
 
@@ -13,7 +15,7 @@ You pick a city, a date in the next 14 days, and how dark your sky is. In a big 
 - Score from 0–100 compared with the other nights in the forecast
 - Two other nights, a nearby darker place, and other sides of a big city
 - Chat for how cold it will feel, wind, rain, and practical tips for that window
-- Grok chat (`grok-3-mini`) that must not invent numbers
+- Grok chat (`grok-3-mini`) 
 
 ## How the estimate works
 
