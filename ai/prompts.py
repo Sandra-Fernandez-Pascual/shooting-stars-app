@@ -13,26 +13,35 @@ or location. If asked about dates or places, say that is already on the page.
 Your job is extra help only: temperature, wind, rain, humidity, what to
 wear, and practical viewing tips. Never invent weather numbers.
 
-If NEAR YOU is present, answer weather questions (cold, wind, rain) in
-two short parts and keep them apart:
-1. YOUR PLACE — use WINDOW CONDITIONS AT YOUR PLACE.
-2. NEAR YOU — name that place, then use WINDOW CONDITIONS AT NEAR YOU.
-If a NATURE NOTE is given, you may say sitting in a park or reserve often
+Only talk about places marked yes under CHAT YOUR PLACE and CHAT NEAR YOU.
+Never give weather or packing tips for a place marked no.
+
+If both are yes and they have not chosen a spot, ask which one
+(where they will watch from, or Near you). Then answer only that place.
+
+If only one is yes, answer only that place. Do not mention the other.
+
+For weather, use the matching WINDOW CONDITIONS block. If a NATURE NOTE
+is given and they chose Near you, you may say sitting in a park often
 feels colder and damper than town; do not change the temperature numbers.
 
-If NEAR YOU is none, only use the YOUR PLACE blocks.
+For practical tips, use only the matching PRACTICAL TIPS block, exactly;
+do not add extra rules.
 
-If they ask for practical tips and NEAR YOU is present, do not paste both
-packing lists. Ask which spot they want tips for (where they will watch
-from, or the Near you place). When they have chosen, use only that
-PRACTICAL TIPS block, exactly; do not add extra rules.
-
-If they ask for practical tips and NEAR YOU is none, use PRACTICAL TIPS
-AT YOUR PLACE exactly.
-
-Explain weather answers in short, plain English (usually 2 to 4 sentences
-per place).
+Explain weather answers in short, plain English (usually 2 to 4 sentences).
 """
+
+ANSWER_ONLY_YOUR_PLACE = (
+    "Answer only for where I will watch from. Use WINDOW CONDITIONS AT "
+    "YOUR PLACE (and PRACTICAL TIPS AT YOUR PLACE if this is about packing). "
+    "Do not mention Near you or any other place."
+)
+
+ANSWER_ONLY_NEAR_YOU = (
+    "Answer only for the Near you place. Use WINDOW CONDITIONS AT NEAR YOU "
+    "(and PRACTICAL TIPS AT NEAR YOU if this is about packing). "
+    "Do not mention the user's street or YOUR PLACE."
+)
 
 
 PRACTICAL_TIPS_FALLBACK = """You are not going to a lecture. You are going on a tiny midnight picnic with the sky. Pack like you love yourself:
@@ -205,15 +214,19 @@ def format_tips_near_you(results):
     )
 
 
-def ask_which_tips_place(results):
-    """Ask which packing list to show when Near you exists."""
+def ask_which_chat_place(results, kind="tips"):
+    """Ask which spot to talk about when both places are worth it."""
     close = results.get("close_location_recommendation")
     name = "the darker spot nearby"
     if close and close.get("name"):
         name = str(close["name"])
+    if kind == "tips":
+        lead = "Practical tips for which spot"
+    else:
+        lead = "Which spot do you want this for"
     return (
-        "Practical tips for which spot — **where you will watch from**, "
-        "or **Near you** ("
+        lead
+        + " — **where you will watch from**, or **Near you** ("
         + name
         + ")?"
     )
@@ -428,5 +441,22 @@ def format_results_context(results):
     else:
         lines.append("WINDOW CONDITIONS AT NEAR YOU: none")
         lines.append("PRACTICAL TIPS AT NEAR YOU: none")
+
+    your_ok = (results.get("expected_meteors") or 0) >= 20
+    near_ok = close is not None and (close.get("expected_meteors") or 0) >= 20
+    lines.append(
+        "CHAT YOUR PLACE: "
+        + ("yes" if your_ok else "no (under 20 meteors; do not offer or answer)")
+    )
+    if near_ok:
+        lines.append(
+            "CHAT NEAR YOU: yes ("
+            + str(close.get("name"))
+            + ")"
+        )
+    else:
+        lines.append(
+            "CHAT NEAR YOU: no (missing or under 20 meteors; do not offer or answer)"
+        )
 
     return "\n".join(lines)

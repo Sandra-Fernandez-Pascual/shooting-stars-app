@@ -16,8 +16,10 @@ st.set_page_config(
 
 from ai.agent import agent
 from ai.prompts import (
+    ANSWER_ONLY_NEAR_YOU,
+    ANSWER_ONLY_YOUR_PLACE,
     SYSTEM_PROMPT,
-    ask_which_tips_place,
+    ask_which_chat_place,
     format_results_context,
     format_tips_near_you,
     format_tips_your_place,
@@ -34,6 +36,15 @@ from ai.utils import (
 )
 
 NEAR_YOU_WORTH_IT = 20
+CHAT_TIPS = "Practical tips for a memorable night"
+CHAT_COLD = "How cold will it be in the viewing window, and what should I wear?"
+CHAT_WIND = "Will it be windy during the viewing window?"
+CHAT_RAIN = (
+    "Will it rain during the viewing window? Should I take a waterproof layer?"
+)
+CHAT_PICK_YOUR = "Chat place: where I will watch from"
+CHAT_PICK_NEAR = "Chat place: near you"
+CHAT_SPARKLES = (CHAT_TIPS, CHAT_COLD, CHAT_WIND, CHAT_RAIN)
 
 
 def _near_you_worth_it(close):
@@ -53,6 +64,51 @@ def _nights_worth_showing(nights):
         if (item.get("expected_meteors") or 0) >= NEAR_YOU_WORTH_IT:
             worth.append(item)
     return worth
+
+
+def _offer_your_place(results):
+    return _main_worth_it(results)
+
+
+def _offer_near_you(results):
+    return _near_you_worth_it(results.get("close_location_recommendation"))
+
+
+def _is_tips_topic(topic):
+    return topic == CHAT_TIPS or str(topic).startswith("Practical tips")
+
+
+def _answer_chat_topic(topic, place, results, messages):
+    """One packing list or one Grok weather answer, for one place only."""
+    if _is_tips_topic(topic):
+        if place == "near":
+            return format_tips_near_you(results)
+        return format_tips_your_place(results)
+    lock = ANSWER_ONLY_NEAR_YOU
+    if place == "your":
+        lock = ANSWER_ONLY_YOUR_PLACE
+    grok_messages = list(messages) + [
+        {"role": "user", "content": str(topic) + "\n\n" + lock}
+    ]
+    return agent(grok_messages)
+
+
+def _place_from_text(text, close):
+    """Guess your vs near from a typed reply. None if unclear."""
+    lowered = (text or "").lower()
+    name = ""
+    if close:
+        name = str(close.get("name") or "").lower()
+    if "near" in lowered or (name and name in lowered):
+        return "near"
+    if (
+        "watch" in lowered
+        or "street" in lowered
+        or "my place" in lowered
+        or "here" in lowered
+    ):
+        return "your"
+    return None
 
 
 def _show_near_you(close):
@@ -90,8 +146,10 @@ if "results" not in st.session_state:
     st.session_state["results"] = None
 if "messages" not in st.session_state:
     st.session_state["messages"] = []
-if "awaiting_tips_location" not in st.session_state:
-    st.session_state["awaiting_tips_location"] = False
+if "awaiting_chat_location" not in st.session_state:
+    st.session_state["awaiting_chat_location"] = False
+if "chat_topic" not in st.session_state:
+    st.session_state["chat_topic"] = None
 
 dates = forecast_dates()
 min_date = dates[0]
@@ -149,15 +207,18 @@ if st.button("Find best viewing time", type="primary"):
                 st.error("Something went wrong. Please try again.")
             st.session_state["results"] = None
             st.session_state["messages"] = []
-            st.session_state["awaiting_tips_location"] = False
+            st.session_state["awaiting_chat_location"] = False
+            st.session_state["chat_topic"] = None
         else:
             st.session_state["results"] = results
-            st.session_state["awaiting_tips_location"] = False
+            st.session_state["awaiting_chat_location"] = False
+            st.session_state["chat_topic"] = None
             close = results.get("close_location_recommendation")
             weak_night = not _main_worth_it(results)
             if weak_night and not _near_you_worth_it(close):
                 st.session_state["messages"] = []
-                st.session_state["awaiting_tips_location"] = False
+                st.session_state["awaiting_chat_location"] = False
+                st.session_state["chat_topic"] = None
             else:
                 context = format_results_context(results)
                 if weak_night:
@@ -288,7 +349,7 @@ if results and results.get("ok") and _main_worth_it(results):
             )
 
     close = results.get("close_location_recommendation")
-    if close:
+    if _near_you_worth_it(close):
         _show_near_you(close)
 
     around = []
@@ -347,35 +408,72 @@ if results and results.get("ok") and (
         st.session_state["messages"].append(
             {"role": "user", "content": pending}
         )
+        offer_your = _offer_your_place(results)
+        offer_near = _offer_near_you(results)
         close = results.get("close_location_recommendation")
-        if pending == "Practical tips: where I will watch from":
-            st.session_state["awaiting_tips_location"] = False
-            reply = format_tips_your_place(results)
-        elif pending == "Practical tips: near you":
-            st.session_state["awaiting_tips_location"] = False
-            reply = format_tips_near_you(results)
-        elif pending == "Practical tips for a memorable night":
-            if close:
-                st.session_state["awaiting_tips_location"] = True
-                reply = ask_which_tips_place(results)
+        kind = "tips"
+        if pending in (CHAT_COLD, CHAT_WIND, CHAT_RAIN):
+            kind = "weather"
+
+        if pending == CHAT_PICK_YOUR:
+            st.session_state["awaiting_chat_location"] = False
+            topic = st.session_state.get("chat_topic") or CHAT_TIPS
+            reply = _answer_chat_topic(
+                topic, "your", results, st.session_state["messages"]
+            )
+        elif pending == CHAT_PICK_NEAR:
+            st.session_state["awaiting_chat_location"] = False
+            topic = st.session_state.get("chat_topic") or CHAT_TIPS
+            reply = _answer_chat_topic(
+                topic, "near", results, st.session_state["messages"]
+            )
+        elif pending in CHAT_SPARKLES:
+            if offer_your and offer_near:
+                st.session_state["awaiting_chat_location"] = True
+                st.session_state["chat_topic"] = pending
+                reply = ask_which_chat_place(results, kind)
+            elif offer_near:
+                st.session_state["awaiting_chat_location"] = False
+                reply = _answer_chat_topic(
+                    pending, "near", results, st.session_state["messages"]
+                )
             else:
-                reply = format_tips_your_place(results)
-        elif st.session_state.get("awaiting_tips_location") and close:
-            text = pending.lower()
-            name = str(close.get("name") or "").lower()
-            if "near" in text or (name and name in text):
-                st.session_state["awaiting_tips_location"] = False
-                reply = format_tips_near_you(results)
-            elif (
-                "watch" in text
-                or "street" in text
-                or "my place" in text
-                or "here" in text
-            ):
-                st.session_state["awaiting_tips_location"] = False
-                reply = format_tips_your_place(results)
+                st.session_state["awaiting_chat_location"] = False
+                reply = _answer_chat_topic(
+                    pending, "your", results, st.session_state["messages"]
+                )
+        elif st.session_state.get("awaiting_chat_location"):
+            picked = _place_from_text(pending, close)
+            if picked == "near" and offer_near:
+                st.session_state["awaiting_chat_location"] = False
+                topic = st.session_state.get("chat_topic") or CHAT_TIPS
+                reply = _answer_chat_topic(
+                    topic, "near", results, st.session_state["messages"]
+                )
+            elif picked == "your" and offer_your:
+                st.session_state["awaiting_chat_location"] = False
+                topic = st.session_state.get("chat_topic") or CHAT_TIPS
+                reply = _answer_chat_topic(
+                    topic, "your", results, st.session_state["messages"]
+                )
+            elif offer_your and offer_near:
+                topic = st.session_state.get("chat_topic") or CHAT_TIPS
+                kind = "tips"
+                if topic in (CHAT_COLD, CHAT_WIND, CHAT_RAIN):
+                    kind = "weather"
+                reply = ask_which_chat_place(results, kind)
+            elif offer_near:
+                st.session_state["awaiting_chat_location"] = False
+                topic = st.session_state.get("chat_topic") or pending
+                reply = _answer_chat_topic(
+                    topic, "near", results, st.session_state["messages"]
+                )
             else:
-                reply = ask_which_tips_place(results)
+                st.session_state["awaiting_chat_location"] = False
+                topic = st.session_state.get("chat_topic") or pending
+                reply = _answer_chat_topic(
+                    topic, "your", results, st.session_state["messages"]
+                )
         else:
             reply = agent(st.session_state["messages"])
         st.session_state["messages"].append(
@@ -398,25 +496,17 @@ if results and results.get("ok") and (
         )
         row1a, row1b = st.columns(2)
         if row1a.button("✨ How cold? What to wear?"):
-            st.session_state["pending_chat"] = (
-                "How cold will it be in the viewing window, and what should I wear?"
-            )
+            st.session_state["pending_chat"] = CHAT_COLD
             st.rerun()
         if row1b.button("🌟 Will it be windy?"):
-            st.session_state["pending_chat"] = (
-                "Will it be windy during the viewing window?"
-            )
+            st.session_state["pending_chat"] = CHAT_WIND
             st.rerun()
         row2a, row2b = st.columns(2)
         if row2a.button("⭐ Will it rain?"):
-            st.session_state["pending_chat"] = (
-                "Will it rain during the viewing window? Should I take a waterproof layer?"
-            )
+            st.session_state["pending_chat"] = CHAT_RAIN
             st.rerun()
         if row2b.button("🌠 Practical tips for a memorable night"):
-            st.session_state["pending_chat"] = (
-                "Practical tips for a memorable night"
-            )
+            st.session_state["pending_chat"] = CHAT_TIPS
             st.rerun()
 
         for msg in st.session_state["messages"]:
@@ -428,16 +518,16 @@ if results and results.get("ok") and (
             st.chat_message(msg["role"], avatar=avatar).write(msg["content"])
 
         close = results.get("close_location_recommendation")
-        if st.session_state.get("awaiting_tips_location") and close:
+        if st.session_state.get("awaiting_chat_location"):
             pick1, pick2 = st.columns(2)
-            if pick1.button("Where I will watch from"):
-                st.session_state["pending_chat"] = (
-                    "Practical tips: where I will watch from"
-                )
-                st.rerun()
-            if pick2.button("Near you · " + str(close["name"])):
-                st.session_state["pending_chat"] = "Practical tips: near you"
-                st.rerun()
+            if _offer_your_place(results):
+                if pick1.button("Where I will watch from"):
+                    st.session_state["pending_chat"] = CHAT_PICK_YOUR
+                    st.rerun()
+            if _offer_near_you(results) and close:
+                if pick2.button("Near you · " + str(close["name"])):
+                    st.session_state["pending_chat"] = CHAT_PICK_NEAR
+                    st.rerun()
 
         prompt = st.chat_input("✨ How cold? What to wear? Practical tips?")
         if prompt:
