@@ -90,6 +90,15 @@ SKY_QUALITY_MAP = {
     SKY_DOWNTOWN: {"id": "downtown", "bortle": 8, "lm_base": 4.0},
 }
 
+# Dingle is not a Berlin suburb. Village stays close to countryside
+# so a 20-meteor night in a field is still a 20-meteor night in town.
+SKY_QUALITY_MAP_SMALL = {
+    SKY_DARK: {"id": "dark", "bortle": 2, "lm_base": 7.0},
+    SKY_SUBURB: {"id": "suburb", "bortle": 3, "lm_base": 6.9},
+    SKY_CITY: {"id": "city", "bortle": 4, "lm_base": 6.0},
+    SKY_DOWNTOWN: {"id": "downtown", "bortle": 5, "lm_base": 5.5},
+}
+
 SKY_QUALITY_HELP = "Brighter places hide more meteors."
 
 # Ask for a side of town only when the place is a real city.
@@ -170,16 +179,19 @@ def _geocode_city_cached(city_name):
     }
 
 
-def sky_quality_info(label):
+def sky_quality_info(label, large_city=True):
     """Turn a sky-quality label into Bortle class and baseline LM.
 
     Args:
         label (str): one of SKY_QUALITY_OPTIONS.
+        large_city (bool): False uses the small-town table (a village
+            is not scored like a city suburb).
 
     Returns:
-        dict: keys bortle and lm_base.
+        dict: keys id, bortle, and lm_base.
     """
-    return SKY_QUALITY_MAP.get(label, SKY_QUALITY_MAP[SKY_SUBURB])
+    table = SKY_QUALITY_MAP if large_city else SKY_QUALITY_MAP_SMALL
+    return dict(table.get(label, table[SKY_SUBURB]))
 
 
 def sky_quality_id(label):

@@ -25,6 +25,7 @@ from ai.utils import (
     CITY_PART_CENTRE,
     CITY_PART_SMALL,
     SCORE_EXPLANATION,
+    SKY_DARK,
     apply_city_part_offset,
     compass_sector,
     find_nearby_dark_sites,
@@ -595,6 +596,7 @@ def evaluate_one_night(weather, latitude, longitude, night_date, showers, lm_bas
     shower = find_active_shower(showers, night_date)
     zhr = zhr_for_date(shower, night_date)
     hours = night_of_date_hours(weather, night_date)
+    n_forecast_hours = len(hours)
     hours = add_astronomy_columns(hours, latitude, longitude, shower, lm_base, zhr)
     night_only = hours[hours["is_astronomical_night"]].copy()
     window = best_three_hour_window(night_only)
@@ -608,6 +610,33 @@ def evaluate_one_night(weather, latitude, longitude, night_date, showers, lm_bas
         window_local = window["window_local"]
         window_start = window["window_start"]
         window_end = window["window_end"]
+        win_mask = (night_only["time"] >= window_start) & (
+            night_only["time"] <= window_end
+        )
+        block = night_only.loc[win_mask]
+        if len(block) == 0:
+            block = night_only
+    else:
+        block = night_only
+
+    cloud_pct = None
+    rain_mm = 0.0
+    moon_alt = None
+    moon_illum = None
+    if len(block) > 0:
+        clouds = block["cloud_cover_pct"].dropna()
+        if len(clouds) > 0:
+            cloud_pct = float(clouds.mean())
+        if "precipitation_mm" in block.columns:
+            rain_mm = float(block["precipitation_mm"].fillna(0).sum())
+        if "moon_alt_deg" in block.columns:
+            alts = block["moon_alt_deg"].dropna()
+            if len(alts) > 0:
+                moon_alt = float(alts.max())
+        if "moon_illum" in block.columns:
+            illums = block["moon_illum"].dropna()
+            if len(illums) > 0:
+                moon_illum = float(illums.max())
 
     shower_name = None
     if shower is not None:
@@ -623,8 +652,93 @@ def evaluate_one_night(weather, latitude, longitude, night_date, showers, lm_bas
         "window_start": window_start,
         "window_end": window_end,
         "n_night_hours": len(night_only),
+        "n_forecast_hours": n_forecast_hours,
         "has_window": window is not None,
+        "window_cloud_pct": cloud_pct,
+        "window_rain_mm": rain_mm,
+        "window_moon_alt": moon_alt,
+        "window_moon_illum": moon_illum,
     }
+
+
+def why_night_is_weak(
+    selected, sky_quality, close_place, weather, latitude, longitude, showers
+):
+    """Real reasons the count is under 20, with what the user can try next.
+
+    Lights are only mentioned if a darker sky on the same weather would
+    still reach 20. Cloud and rain come from the viewing hours, not the menu.
+    """
+    lines = []
+    rain = selected.get("window_rain_mm") or 0
+    cloud = selected.get("window_cloud_pct")
+    wet = rain >= 0.5
+    cloudy = cloud is not None and cloud >= 50
+    if wet and cloudy:
+        lines.append(
+            "The viewing hours look rainy and cloudy. Try another date, "
+            "or a place with clearer weather."
+        )
+    elif wet:
+        lines.append(
+            "Rain is likely in the viewing hours. Try another date, "
+            "or a place with clearer weather."
+        )
+    elif cloudy:
+        lines.append(
+            "Those hours look cloudy. Try another date, "
+            "or a place with clearer weather."
+        )
+
+    near_ok = (
+        close_place is not None
+        and (close_place.get("expected_meteors") or 0) >= 20
+    )
+    if sky_quality_id(sky_quality) != "dark":
+        lights = near_ok
+        if not lights:
+            dark_night = evaluate_one_night(
+                weather,
+                latitude,
+                longitude,
+                selected["date"],
+                showers,
+                sky_quality_info(SKY_DARK)["lm_base"],
+            )
+            lights = (dark_night.get("expected_meteors") or 0) >= 20
+        if lights:
+            if near_ok:
+                lines.append(
+                    "Lights at this spot hide shooting stars. A darker place "
+                    "nearby still reaches 20 — see Near you below."
+                )
+            else:
+                lines.append(
+                    "Lights at this spot hide shooting stars. A darker field "
+                    "or park can be better."
+                )
+
+    moon_alt = selected.get("window_moon_alt") or 0
+    moon_illum = selected.get("window_moon_illum") or 0
+    if moon_alt > 10 and moon_illum >= 0.45:
+        lines.append(
+            "A bright Moon washes out shooting stars. "
+            "A date with less moonlight may help."
+        )
+
+    zhr = selected.get("zhr") or 0
+    if selected.get("shower") is None or zhr < 8:
+        lines.append(
+            "There is no strong meteor shower this night. "
+            "Another date in the next 14 days may be busier."
+        )
+
+    if not lines:
+        lines.append(
+            "Fewer than 20 shooting stars are likely in the best three hours. "
+            "Try another date or a different location."
+        )
+    return lines
 
 
 def evaluate_all_nights(weather, latitude, longitude, dates, showers, lm_base):
@@ -834,9 +948,11 @@ def _place_forecast_dict(site, better_sky, night, selected, night_results):
     }
 
 
-def _best_night_at_site(site, better_sky, weather, showers, dates_to_try):
+def _best_night_at_site(
+    site, better_sky, weather, showers, dates_to_try, large_city=True
+):
     """Evaluate a nearby site on the candidate dates; keep the best night."""
-    quality = sky_quality_info(better_sky)
+    quality = sky_quality_info(better_sky, large_city)
     best = None
     for night_date in dates_to_try:
         alt = evaluate_one_night(
@@ -867,7 +983,15 @@ def two_other_nights(night_results, selected):
     return summaries
 
 
-def _forecast_one_site(site, current_sky_quality, weather, showers, selected, night_results):
+def _forecast_one_site(
+    site,
+    current_sky_quality,
+    weather,
+    showers,
+    selected,
+    night_results,
+    large_city=True,
+):
     """Forecast the selected date at one nearby site, or None."""
     better_sky = darker_sky_for_site(
         current_sky_quality, site["kind"], site.get("extent_km")
@@ -875,7 +999,7 @@ def _forecast_one_site(site, current_sky_quality, weather, showers, selected, ni
     if better_sky is None:
         return None
     night = _best_night_at_site(
-        site, better_sky, weather, showers, [selected["date"]]
+        site, better_sky, weather, showers, [selected["date"]], large_city
     )
     if night is None:
         return None
@@ -1119,6 +1243,7 @@ def nearby_place_forecasts(
             showers,
             selected,
             night_results,
+            large_city,
         )
 
     around_forecasts = []
@@ -1130,11 +1255,47 @@ def nearby_place_forecasts(
             showers,
             selected,
             night_results,
+            large_city,
         )
         if forecast is not None:
             around_forecasts.append(forecast)
 
     return close_forecast, around_forecasts
+
+
+def _other_dark_night(night_results, selected_date):
+    """Another date in the 14-day window with astronomical night.
+
+    Prefers a later date (night coming back). If nights are shrinking,
+    uses the closest earlier date instead.
+    """
+    later = None
+    earlier = None
+    for item in night_results:
+        if item.get("n_night_hours", 0) <= 0:
+            continue
+        if selected_date is None or item["date"] > selected_date:
+            if later is None:
+                later = item
+        elif item["date"] < selected_date:
+            earlier = item
+    if later is not None:
+        return format_date_long(later["date"]), "later"
+    if earlier is not None:
+        return format_date_long(earlier["date"]), "earlier"
+    return None, None
+
+
+def _sun_too_high_phrase(latitude, when):
+    """Say 'in summer' only in the bright season; else 'at this time of year'."""
+    if when is None:
+        return "at this time of year"
+    month = when.month
+    north_bright = latitude >= 0 and month in (5, 6, 7, 8)
+    south_bright = latitude < 0 and month in (11, 12, 1, 2)
+    if north_bright or south_bright:
+        return "in summer"
+    return "at this time of year"
 
 
 def run_pipeline(city_name, selected_date, sky_quality, city_part=None):
@@ -1165,7 +1326,7 @@ def run_pipeline(city_name, selected_date, sky_quality, city_part=None):
     if weather is None:
         return {"ok": False, "error": "weather_timeout"}
 
-    quality = sky_quality_info(sky_quality)
+    quality = sky_quality_info(sky_quality, large_city)
     showers = load_showers()
     dates = forecast_dates()
 
@@ -1184,14 +1345,20 @@ def run_pipeline(city_name, selected_date, sky_quality, city_part=None):
     night_results = add_scores(night_results)
     selected = find_night(night_results, selected_date)
 
-    if selected is None:
-        return {"ok": False, "error": "no_night_hours"}
-
-    if selected["n_night_hours"] == 0:
+    if selected is None or selected["n_night_hours"] == 0:
+        dark_label, dark_when = _other_dark_night(night_results, selected_date)
+        reason = "white_nights"
+        if selected is None or selected.get("n_forecast_hours", 0) == 0:
+            reason = "no_forecast"
+        when = selected["date"] if selected is not None else selected_date
         return {
             "ok": False,
             "error": "no_night_hours",
             "resolved_location": place["display_name"],
+            "no_night_reason": reason,
+            "next_dark_date_label": dark_label,
+            "dark_night_when": dark_when,
+            "sun_too_high_phrase": _sun_too_high_phrase(user_lat, when),
         }
 
     other_nights = two_other_nights(night_results, selected)
@@ -1230,6 +1397,17 @@ def run_pipeline(city_name, selected_date, sky_quality, city_part=None):
     comfort = comfort_conditions(
         weather, selected.get("window_start"), selected.get("window_end")
     )
+    weak_night_reasons = []
+    if (selected.get("expected_meteors") or 0) < 20:
+        weak_night_reasons = why_night_is_weak(
+            selected,
+            sky_quality,
+            close_place,
+            weather,
+            user_lat,
+            user_lon,
+            showers,
+        )
     if close_place is not None:
         close_place["comfort_conditions"] = comfort_for_nearby_place(
             close_place, place.get("timezone")
@@ -1264,5 +1442,6 @@ def run_pipeline(city_name, selected_date, sky_quality, city_part=None):
         "close_location_recommendation": close_place,
         "around_city_recommendations": around_city_places,
         "comfort_conditions": comfort,
+        "weak_night_reasons": weak_night_reasons,
         "n_night_hours": selected["n_night_hours"],
     }

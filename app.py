@@ -32,7 +32,6 @@ from ai.utils import (
     SKY_QUALITY_HELP,
     SKY_QUALITY_OPTIONS,
     forecast_dates,
-    sky_quality_id,
 )
 
 NEAR_YOU_WORTH_IT = 20
@@ -197,12 +196,60 @@ if st.button("Find best viewing time", type="primary"):
                 st.warning("Could not download the weather forecast. Please try again.")
             elif error == "no_night_hours":
                 place = results.get("resolved_location", city)
-                st.info(
-                    "Almost no astronomical night hours at "
-                    + str(place)
-                    + " on this date (the Sun never gets 18 degrees below the horizon). "
-                    "Try another date or city."
+                reason = results.get("no_night_reason")
+                next_dark = results.get("next_dark_date_label")
+                dark_when = results.get("dark_night_when")
+                season = results.get("sun_too_high_phrase") or "in summer"
+                season_cap = season[0].upper() + season[1:]
+                sun_bit = (
+                    season_cap
+                    + " this far from the equator the Sun never gets 18 degrees "
+                    "below the horizon. "
                 )
+                if reason == "no_forecast":
+                    if next_dark:
+                        st.info(
+                            "No hourly sky data for this date at "
+                            + str(place)
+                            + ". Try "
+                            + str(next_dark)
+                            + "."
+                        )
+                    else:
+                        st.info(
+                            "No hourly sky data for this date at "
+                            + str(place)
+                            + ". Try an earlier date in the next two weeks."
+                        )
+                elif dark_when == "later" and next_dark:
+                    st.info(
+                        "No astronomical night at "
+                        + str(place)
+                        + " on this date. "
+                        + sun_bit
+                        + "Night returns on "
+                        + str(next_dark)
+                        + ", or try a city closer to the equator."
+                    )
+                elif dark_when == "earlier" and next_dark:
+                    st.info(
+                        "No astronomical night at "
+                        + str(place)
+                        + " on this date. "
+                        + sun_bit
+                        + "Try "
+                        + str(next_dark)
+                        + " instead, when the Sun still gets 18 degrees below "
+                        "the horizon, or a city closer to the equator."
+                    )
+                else:
+                    st.info(
+                        "No astronomical night at "
+                        + str(place)
+                        + " on these dates. "
+                        + sun_bit
+                        + "Try autumn or winter, or a city closer to the equator."
+                    )
             else:
                 st.error("Something went wrong. Please try again.")
             st.session_state["results"] = None
@@ -243,33 +290,19 @@ results = st.session_state.get("results")
 
 if results and results.get("ok") and not _main_worth_it(results):
     close = results.get("close_location_recommendation")
-    lights = ""
-    if sky_quality_id(results.get("sky_quality")) in ("city", "downtown", "suburb"):
-        lights = (
-            " Light pollution from the city washes out shooting stars."
-        )
+    reasons = results.get("weak_night_reasons") or []
+    text = (
+        "This night does not reach 20 shooting stars at "
+        + str(results["resolved_location"])
+        + " on "
+        + str(results["selected_date_label"])
+        + "."
+    )
+    if reasons:
+        text = text + " " + " ".join(reasons)
+    st.warning(text)
     if _near_you_worth_it(close):
-        st.warning(
-            "This night does not look good for shooting stars at "
-            + str(results["resolved_location"])
-            + " on "
-            + str(results["selected_date_label"])
-            + "."
-            + lights
-            + " A darker spot nearby still looks worth it with tonight's "
-            + "weather (about 20 or more meteors) — see **Near you** below."
-        )
         _show_near_you(close)
-    else:
-        st.warning(
-            "This night does not look good for shooting stars at "
-            + str(results["resolved_location"])
-            + " on "
-            + str(results["selected_date_label"])
-            + "."
-            + lights
-            + " Try another date in the next 14 days, or try a different location."
-        )
     better_nights = _nights_worth_showing(results.get("other_nights"))
     if better_nights:
         st.caption("Other nights at this place that look better:")
