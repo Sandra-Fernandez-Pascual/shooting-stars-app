@@ -39,6 +39,11 @@ def _near_you_worth_it(close):
     return close is not None and (close.get("expected_meteors") or 0) >= NEAR_YOU_WORTH_IT
 
 
+def _main_worth_it(results):
+    """True if the user's pin has enough meteors to show the forecast."""
+    return results is not None and (results.get("expected_meteors") or 0) >= NEAR_YOU_WORTH_IT
+
+
 def _nights_worth_showing(nights):
     """Other nights with at least NEAR_YOU_WORTH_IT meteors."""
     worth = []
@@ -143,12 +148,12 @@ if st.button("Find best viewing time", type="primary"):
         else:
             st.session_state["results"] = results
             close = results.get("close_location_recommendation")
-            no_meteors = (results.get("expected_meteors") or 0) <= 0
-            if no_meteors and not _near_you_worth_it(close):
+            weak_night = not _main_worth_it(results)
+            if weak_night and not _near_you_worth_it(close):
                 st.session_state["messages"] = []
             else:
                 context = format_results_context(results)
-                if no_meteors:
+                if weak_night:
                     greeting = (
                         "Your street looks quiet tonight. The darker spot "
                         "below is the better bet. If you want a hand packing "
@@ -168,12 +173,12 @@ if st.button("Find best viewing time", type="primary"):
 
 results = st.session_state.get("results")
 
-if results and results.get("ok") and (results.get("expected_meteors") or 0) <= 0:
+if results and results.get("ok") and not _main_worth_it(results):
     close = results.get("close_location_recommendation")
     lights = ""
     if sky_quality_id(results.get("sky_quality")) in ("city", "downtown", "suburb"):
         lights = (
-            " Light pollution from the city washes out faint shooting stars."
+            " Light pollution from the city washes out shooting stars."
         )
     if _near_you_worth_it(close):
         st.warning(
@@ -212,7 +217,7 @@ if results and results.get("ok") and (results.get("expected_meteors") or 0) <= 0
                 + ")."
             )
 
-if results and results.get("ok") and (results.get("expected_meteors") or 0) > 0:
+if results and results.get("ok") and _main_worth_it(results):
     st.subheader("Viewing forecast")
     st.write("**Location:** " + results["resolved_location"])
     st.write("**Date:** " + results["selected_date_label"])
@@ -327,7 +332,7 @@ if results and results.get("ok") and (results.get("expected_meteors") or 0) > 0:
         )
 
 if results and results.get("ok") and (
-    (results.get("expected_meteors") or 0) > 0
+    _main_worth_it(results)
     or _near_you_worth_it(results.get("close_location_recommendation"))
 ):
     pending = st.session_state.pop("pending_chat", None)
