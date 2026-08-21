@@ -13,12 +13,10 @@ Open the [live app](https://shooting-stars.streamlit.app/), then:
 
 1. Enter a city.
 2. Pick a date in the next 14 days.
-3. Say how dark your sky is. In a big city, you can also pick a side of town.
+3. Say where will you watch from. In a big city, you can also pick a side of town.
 4. Click **Find best viewing time**.
 5. Read your forecast: best hour, estimated meteors, other nights, and darker spots nearby.
 6. Ask the chat about clothing, wind, rain, or practical tips for that night.
-
-The first search can take about 30–60 seconds.
 
 ## Features
 

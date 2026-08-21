@@ -10,33 +10,18 @@ The model is **grok-3-mini** via the OpenAI-compatible xAI API (`ai/agent.py`).
 
 ## End-to-end flow
 
+1. You pick a city, a date, and where you will watch from.
+2. Python builds the forecast and the page shows it. Chat has not started talking to Grok yet.
+3. If you click **Practical tips**, Python writes the packing list. Grok is not used.
+4. If you ask about cold, wind, rain, or type a question, Grok answers using the numbers already on the page.
+
 ```mermaid
-sequenceDiagram
-  participant User
-  participant App as app.py
-  participant Pipe as run_pipeline
-  participant Tips as format_practical_tips
-  participant Agent as agent()
-  participant Grok as grok-3-mini
-
-  User->>App: City, date, sky, Find best viewing time
-  App->>Pipe: run_pipeline(...)
-  Pipe-->>App: results dict
-  App->>App: messages = system prompt + context, plus greeting
-
-  alt Practical tips button
-    User->>App: Practical tips for a memorable night
-    App->>Tips: comfort_conditions
-    Tips-->>App: packing list
-    App-->>User: canned list, no Grok
-  else Weather question or typed chat
-    User->>App: How cold / wind / rain / free text
-    App->>Agent: full messages list
-    Agent->>Grok: chat.completions.create
-    Grok-->>Agent: text
-    Agent-->>App: reply
-    App-->>User: chat bubble
-  end
+flowchart TD
+  pick[You search] --> calc[Python builds the forecast]
+  calc --> page[The page shows the results]
+  page --> ask{What do you ask next?}
+  ask -->|Practical tips| tips[Python packing list]
+  ask -->|Weather or a typed question| grok[Grok explains those numbers]
 ```
 
 ## When Grok is called
