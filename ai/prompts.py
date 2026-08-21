@@ -11,11 +11,24 @@ and other places. Never repeat those. Never suggest another date, time,
 or location. If asked about dates or places, say that is already on the page.
 
 Your job is extra help only: temperature, wind, rain, humidity, what to
-wear, and practical viewing tips. Use WINDOW CONDITIONS for weather.
-If they ask for practical tips, use PRACTICAL TIPS FOR A MEMORABLE NIGHT
-exactly; do not add extra rules. Never invent weather numbers.
+wear, and practical viewing tips. Never invent weather numbers.
 
-Explain weather answers in short, plain English (usually 2 to 4 sentences).
+If NEAR YOU is present, always answer in two short parts and keep them
+apart:
+1. YOUR PLACE — use WINDOW CONDITIONS AT YOUR PLACE (and PRACTICAL TIPS
+   AT YOUR PLACE if they asked for tips).
+2. NEAR YOU — name that place, then use WINDOW CONDITIONS AT NEAR YOU
+   (and PRACTICAL TIPS AT NEAR YOU if they asked for tips).
+If a NATURE NOTE is given, you may say sitting in a park or reserve often
+feels colder and damper than town; do not change the temperature numbers.
+
+If NEAR YOU is none, only use the YOUR PLACE blocks.
+
+If they ask for practical tips, use the matching PRACTICAL TIPS text
+exactly; do not add extra rules.
+
+Explain weather answers in short, plain English (usually 2 to 4 sentences
+per place).
 """
 
 
@@ -29,11 +42,33 @@ PRACTICAL_TIPS_FALLBACK = """You are not going to a lecture. You are going on a 
 
 Leave the telescope at home. Meteors are shy, fast, and everywhere. Your own eyes and a wide view are the whole romance."""
 
+NATURE_FEEL_NOTE = (
+    "Sitting still on grass in a park or reserve often feels colder and "
+    "damper than the street, even when the forecast numbers are close."
+)
 
-def format_practical_tips(comfort=None):
+NATURE_KINDS = (
+    "national park",
+    "nature reserve",
+    "forest",
+    "park",
+)
+
+
+def is_nature_site(spot):
+    """True if Near you is a park, reserve, or forest."""
+    if not spot:
+        return False
+    return str(spot.get("kind") or "") in NATURE_KINDS
+
+
+def format_practical_tips(comfort=None, heading=None, in_nature=False):
     """Packing list for this viewing window's weather, not a generic lecture."""
     if not comfort:
-        return PRACTICAL_TIPS_FALLBACK
+        body = PRACTICAL_TIPS_FALLBACK
+        if heading:
+            return heading + "\n\n" + body
+        return body
 
     tmin = comfort.get("temp_min_c")
     tmax = comfort.get("temp_max_c")
@@ -80,6 +115,9 @@ def format_practical_tips(comfort=None):
                 + " C). Light layers. Skip the winter coat; you will overheat before the first streak."
             )
 
+    if in_nature:
+        items.append(NATURE_FEEL_NOTE)
+
     if rain >= 0.5:
         items.append(
             "A little rain is in the forecast ("
@@ -125,13 +163,40 @@ def format_practical_tips(comfort=None):
         "Your own eyes and a wide view are the whole romance."
     )
     bullets = "\n".join("- " + item for item in items)
-    return (
+    body = (
         "You are not going to a lecture. You are going on a tiny midnight "
         "picnic with the sky. Pack like you love yourself, for *this* night:\n\n"
         + bullets
         + "\n\n"
         + closer
     )
+    if heading:
+        return heading + "\n\n" + body
+    return body
+
+
+def format_tips_for_results(results):
+    """Packing list for your place, plus Near you when that card exists."""
+    your = format_practical_tips(
+        results.get("comfort_conditions"),
+        heading="Where you will watch from",
+    )
+    close = results.get("close_location_recommendation")
+    if not close:
+        return your
+    near_heading = (
+        "Near you · "
+        + str(close.get("name"))
+        + " ("
+        + str(close.get("kind"))
+        + ")"
+    )
+    near = format_practical_tips(
+        close.get("comfort_conditions"),
+        heading=near_heading,
+        in_nature=is_nature_site(close),
+    )
+    return your + "\n\n" + near
 
 
 def _place_context_line(spot, prefix):
@@ -172,6 +237,29 @@ def _place_context_line(spot, prefix):
         + compared
         + ". Map: "
         + str(spot.get("maps_url"))
+    )
+
+
+def _comfort_context_line(comfort, label):
+    """One WINDOW CONDITIONS block as text for Grok."""
+    if not comfort:
+        return label + ": none"
+    return (
+        label
+        + ": temperature "
+        + str(comfort.get("temp_min_c"))
+        + " to "
+        + str(comfort.get("temp_max_c"))
+        + " C, wind up to "
+        + str(comfort.get("wind_kmh"))
+        + " km/h, rain "
+        + str(comfort.get("rain_mm"))
+        + " mm, humidity "
+        + str(comfort.get("humidity_pct"))
+        + "%, cloud "
+        + str(comfort.get("cloud_pct"))
+        + "%. Dress hint: "
+        + str(comfort.get("dress_hint"))
     )
 
 
@@ -283,29 +371,42 @@ def format_results_context(results):
             index += 1
 
     comfort = results.get("comfort_conditions")
-    if comfort:
+    lines.append(_comfort_context_line(comfort, "WINDOW CONDITIONS AT YOUR PLACE"))
+    lines.append(
+        "PRACTICAL TIPS AT YOUR PLACE: "
+        + format_practical_tips(comfort, heading="Where you will watch from")
+    )
+
+    close = results.get("close_location_recommendation")
+    if close:
+        close_comfort = close.get("comfort_conditions")
+        near_label = (
+            "WINDOW CONDITIONS AT NEAR YOU ("
+            + str(close.get("name"))
+            + ", "
+            + str(close.get("kind"))
+            + ")"
+        )
+        lines.append(_comfort_context_line(close_comfort, near_label))
+        if is_nature_site(close):
+            lines.append("NATURE NOTE: " + NATURE_FEEL_NOTE)
+        near_heading = (
+            "Near you · "
+            + str(close.get("name"))
+            + " ("
+            + str(close.get("kind"))
+            + ")"
+        )
         lines.append(
-            "WINDOW CONDITIONS (for clothing questions; do not lead with these "
-            "unless asked): temperature "
-            + str(comfort.get("temp_min_c"))
-            + " to "
-            + str(comfort.get("temp_max_c"))
-            + " C, wind up to "
-            + str(comfort.get("wind_kmh"))
-            + " km/h, rain "
-            + str(comfort.get("rain_mm"))
-            + " mm, humidity "
-            + str(comfort.get("humidity_pct"))
-            + "%, cloud "
-            + str(comfort.get("cloud_pct"))
-            + "%. Dress hint: "
-            + str(comfort.get("dress_hint"))
+            "PRACTICAL TIPS AT NEAR YOU: "
+            + format_practical_tips(
+                close_comfort,
+                heading=near_heading,
+                in_nature=is_nature_site(close),
+            )
         )
     else:
-        lines.append("WINDOW CONDITIONS: none")
-
-    lines.append(
-        "PRACTICAL TIPS FOR A MEMORABLE NIGHT: " + format_practical_tips(comfort)
-    )
+        lines.append("WINDOW CONDITIONS AT NEAR YOU: none")
+        lines.append("PRACTICAL TIPS AT NEAR YOU: none")
 
     return "\n".join(lines)

@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 import requests
+import streamlit as st
 from astropy.coordinates import AltAz, EarthLocation, SkyCoord, get_body, get_sun
 from astropy.time import Time
 from astropy.utils.iers import conf as iers_conf
@@ -21,6 +22,7 @@ iers_conf.auto_max_age = None
 
 from ai.meteor_schema import days_from_peak, find_active_shower, load_showers
 from ai.utils import (
+    CITY_PART_CENTRE,
     CITY_PART_SMALL,
     SCORE_EXPLANATION,
     apply_city_part_offset,
@@ -59,24 +61,30 @@ def fetch_weather(latitude, longitude):
         None if the request failed.
     """
     try:
-        response = requests.get(
-            FORECAST_URL,
-            params={
-                "latitude": latitude,
-                "longitude": longitude,
-                "hourly": (
-                    "cloud_cover,visibility,temperature_2m,"
-                    "wind_speed_10m,precipitation,relative_humidity_2m"
-                ),
-                "timezone": "auto",
-                "forecast_days": 14,
-            },
-            timeout=30,
-        )
-        response.raise_for_status()
-        data = response.json()
-    except requests.RequestException:
+        return _fetch_weather_cached(latitude, longitude)
+    except (requests.RequestException, ValueError):
         return None
+
+
+@st.cache_data(ttl=3600)
+def _fetch_weather_cached(latitude, longitude):
+    """Cached Open-Meteo forecast. Network and empty replies are not stored."""
+    response = requests.get(
+        FORECAST_URL,
+        params={
+            "latitude": latitude,
+            "longitude": longitude,
+            "hourly": (
+                "cloud_cover,visibility,temperature_2m,"
+                "wind_speed_10m,precipitation,relative_humidity_2m"
+            ),
+            "timezone": "auto",
+            "forecast_days": 14,
+        },
+        timeout=30,
+    )
+    response.raise_for_status()
+    data = response.json()
 
     hourly = data.get("hourly", {})
     times = hourly.get("time", [])
@@ -88,7 +96,7 @@ def fetch_weather(latitude, longitude):
     humidities = hourly.get("relative_humidity_2m", [])
 
     if len(times) == 0:
-        return None
+        raise ValueError("empty hourly forecast")
 
     tz_name = data.get("timezone", "UTC")
     try:
@@ -479,6 +487,16 @@ def comfort_conditions(weather, window_start, window_end):
     }
 
 
+def comfort_for_nearby_place(spot):
+    """Weather in the Near you window, from that place's own forecast."""
+    if spot is None:
+        return None
+    park_weather = fetch_weather(spot["latitude"], spot["longitude"])
+    return comfort_conditions(
+        park_weather, spot.get("window_start"), spot.get("window_end")
+    )
+
+
 def evaluate_one_night(weather, latitude, longitude, night_date, showers, lm_base):
     """Compute shower, rates, and the best 3-hour window for one night.
 
@@ -729,6 +747,8 @@ def _place_forecast_dict(site, better_sky, night, selected, night_results):
         "better_than_user_location": (
             night["expected_meteors"] > selected["expected_meteors"]
         ),
+        "window_start": night["window_start"],
+        "window_end": night["window_end"],
     }
 
 
@@ -927,6 +947,25 @@ def _pick_around_city_sites(sites, close_site, count=5, skip_sector=None):
     return picked
 
 
+def _dark_sites_around(place, search_lat, search_lon, user_lat, user_lon, limit):
+    """Named darker places around one pin, with distances from user and centre."""
+    sites = find_nearby_dark_sites(
+        search_lat,
+        search_lon,
+        place.get("name", ""),
+        place.get("country_code", ""),
+        limit=limit,
+        min_gap_km=6,
+    )
+    return _annotate_sites(
+        sites,
+        place["latitude"],
+        place["longitude"],
+        user_lat,
+        user_lon,
+    )
+
+
 def nearby_place_forecasts(
     place,
     user_lat,
@@ -941,6 +980,9 @@ def nearby_place_forecasts(
 ):
     """A spot near the user, plus extra spots around a big city.
 
+    Near you is searched from the user's pin (North, East, …), not the
+    city centre. Other sides of town still use a centre-based list.
+
     All location forecasts are for the user's requested date.
 
     Returns:
@@ -952,32 +994,38 @@ def nearby_place_forecasts(
     limit = 8
     if large_city:
         limit = 20
-    sites = find_nearby_dark_sites(
-        place["latitude"],
-        place["longitude"],
-        place.get("name", ""),
-        place.get("country_code", ""),
-        limit=limit,
-        min_gap_km=6,
+
+    near_user_sites = _dark_sites_around(
+        place, user_lat, user_lon, user_lat, user_lon, limit
     )
-    sites = _annotate_sites(
-        sites,
-        place["latitude"],
-        place["longitude"],
-        user_lat,
-        user_lon,
-    )
-    if len(sites) == 0:
-        return None, []
 
     close_max_km = 25
     if not large_city:
         close_max_km = 20
-    close_site = _pick_close_site(sites, max_km=close_max_km)
+    close_site = None
+    if len(near_user_sites) > 0:
+        close_site = _pick_close_site(near_user_sites, max_km=close_max_km)
+
     around_sites = []
     if large_city:
+        from_centre = user_city_part in (
+            None,
+            CITY_PART_SMALL,
+            CITY_PART_CENTRE,
+        )
+        if from_centre:
+            around_pool = near_user_sites
+        else:
+            around_pool = _dark_sites_around(
+                place,
+                place["latitude"],
+                place["longitude"],
+                user_lat,
+                user_lon,
+                limit,
+            )
         around_sites = _pick_around_city_sites(
-            sites, close_site, count=5, skip_sector=user_city_part
+            around_pool, close_site, count=5, skip_sector=user_city_part
         )
 
     close_forecast = None
@@ -1100,6 +1148,10 @@ def run_pipeline(city_name, selected_date, sky_quality, city_part=None):
     comfort = comfort_conditions(
         weather, selected.get("window_start"), selected.get("window_end")
     )
+    if close_place is not None:
+        close_place["comfort_conditions"] = comfort_for_nearby_place(close_place)
+        close_place.pop("window_start", None)
+        close_place.pop("window_end", None)
 
     return {
         "ok": True,

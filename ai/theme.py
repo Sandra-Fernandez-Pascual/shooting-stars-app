@@ -174,79 +174,6 @@ div[data-testid="stMetric"] {
   border: 1px solid rgba(155, 180, 255, 0.12);
 }
 
-@media (prefers-color-scheme: light) {
-  .stApp, [data-testid="stAppViewContainer"] {
-    background:
-      radial-gradient(1000px 600px at 50% -15%, #b9c8f0 0%, transparent 55%),
-      linear-gradient(180deg, #d7e2f8 0%, #eef2fb 45%, #f7f4ea 100%);
-  }
-  .stApp, [data-testid="stCaptionContainer"] {
-    color: #152047;
-  }
-  h1, h2, h3 {
-    color: #152047 !important;
-  }
-  [data-testid="stWidgetLabel"],
-  [data-testid="stWidgetLabel"] *,
-  [data-testid="stCaptionContainer"],
-  [data-testid="stCaptionContainer"] *,
-  [data-testid="stTextInput"] label,
-  [data-testid="stDateInput"] label,
-  [data-testid="stSelectbox"] label,
-  [data-testid="stSelectbox"] p {
-    color: #152047 !important;
-  }
-  [data-testid="stTextInput"] input,
-  [data-testid="stDateInput"] input,
-  [data-baseweb="select"] > div,
-  [data-baseweb="select"] span {
-    background-color: #ffffff !important;
-    color: #152047 !important;
-  }
-  [data-testid="stTextInput"] input::placeholder {
-    color: #5a6a90 !important;
-  }
-  .starfield span {
-    background: #fff;
-    box-shadow: 0 0 4px #fff;
-  }
-  .stButton > button {
-    background: linear-gradient(180deg, #ffffff 0%, #e8eefc 100%);
-    color: #152047;
-    border-color: rgba(21, 32, 71, 0.18);
-  }
-  .stButton > button[kind="primary"] {
-    background: linear-gradient(180deg, #e8c547 0%, #c9a227 100%);
-    color: #1a1430;
-  }
-  [data-testid="stExpander"],
-  [data-testid="stChatMessage"] {
-    background: rgba(255, 255, 255, 0.88);
-    border-color: rgba(21, 32, 71, 0.12);
-  }
-  [data-testid="stChatMessage"],
-  [data-testid="stChatMessage"] p,
-  [data-testid="stChatMessage"] li,
-  [data-testid="stChatMessage"] span,
-  [data-testid="stExpander"] [data-testid="stMarkdownContainer"] p {
-    color: #152047 !important;
-  }
-  .near-you {
-    background: #151b3a;
-    color: #e8eefc;
-  }
-  .sky-metric {
-    background: #ffffff;
-    border: 1px solid #152047;
-  }
-  .sky-metric-label {
-    color: #6b4e00 !important;
-  }
-  .sky-metric-value {
-    color: #152047 !important;
-  }
-}
-
 @media (max-width: 640px) {
   .block-container {
     padding-left: 0.85rem;
@@ -297,7 +224,7 @@ def _star_dots():
 
 
 def apply_starry_theme():
-    """Paint the night sky behind the app. Follows light/dark system colors."""
+    """Paint the night sky behind the app. Always uses the dark theme."""
     st.markdown(STARRY_CSS, unsafe_allow_html=True)
     st.markdown(
         '<div class="starfield">'

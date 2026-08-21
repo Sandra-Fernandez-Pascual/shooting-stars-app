@@ -34,7 +34,7 @@ A successful search builds `st.session_state["messages"]`:
 A button or `st.chat_input` stores text in `pending_chat`, then Streamlit reruns. On that rerun:
 
 - The user line is appended.
-- If the text is exactly `Practical tips for a memorable night`, Python builds the packing list from `comfort_conditions` (`format_practical_tips`).
+- If the text is exactly `Practical tips for a memorable night`, Python builds the packing list (`format_tips_for_results`): your place, then Near you when that card exists.
 - Otherwise `agent(messages)` is called with the **whole** history (system + greeting + earlier turns + new question).
 
 ## Tools (Python, not Grok)
@@ -53,7 +53,8 @@ These run inside `run_pipeline` **before** chat exists. Grok cannot call them.
 | `nearby_better_date` / `closest_shower_date` | `tools.py` | Extra date hints |
 | `find_nearby_dark_sites` | `utils.py` | OSM / Nominatim darker places |
 | `nearby_place_forecasts` | `tools.py` | Near you + other sides of town |
-| `comfort_conditions` | `tools.py` | Temp, wind, rain, humidity, dress hint for the window |
+| `comfort_conditions` | `tools.py` | Temp, wind, rain, humidity, dress hint for the user's window |
+| `comfort_for_nearby_place` | `tools.py` | Same, from a separate Open-Meteo download at the Near you pin |
 
 `agent()` only creates an xAI client and sends `messages`. If `XAI_API_KEY` is missing, it returns a short error and the forecast on the page still stands.
 
@@ -66,16 +67,17 @@ All of this text lives in `ai/prompts.py`.
 Grok is a friendly helper for watching shooting stars. It must:
 
 1. Talk only about extra help: temperature, wind, rain, humidity, what to wear, and practical tips.
-2. Use **WINDOW CONDITIONS** for weather.
-3. If someone asks for practical tips, use **PRACTICAL TIPS FOR A MEMORABLE NIGHT** as written.
-4. Keep weather answers short (about 2 to 4 sentences).
+2. If **NEAR YOU** exists, answer in two parts: **YOUR PLACE** then **NEAR YOU**, using the matching WINDOW CONDITIONS / PRACTICAL TIPS. Do not mix them.
+3. If someone asks for practical tips, use those PRACTICAL TIPS blocks as written.
+4. Keep weather answers short (about 2 to 4 sentences per place).
+5. A **NATURE NOTE** means sitting in a park often *feels* colder and damper; Grok must not invent different °C.
 
 ### Practical tips (`format_practical_tips`)
 
-Python writes the packing list from the weather in the viewing window (how cold it is, rain, wind, damp grass, insects).
+Python writes the packing list from the weather in the viewing window (how cold it is, rain, wind, damp grass, insects). If Near you exists, there are two lists (your place, then that park, with a nature feel note for reserves and forests).
 
-- The **Practical tips** button shows this list on the page.
-- The same list is copied into Grok’s context, so a typed “practical tips” question can match the button.
+- The **Practical tips** button shows this on the page.
+- The same lists are copied into Grok’s context, so a typed “practical tips” question can match the button.
 - If there is no weather block, `PRACTICAL_TIPS_FALLBACK` is used instead.
 
 ## Context packed into the system message
@@ -94,10 +96,13 @@ Typical blocks:
 | Closest date with a shower | Only if the chosen night has no major shower |
 | NEAR YOU | Named place, kind, distance, side, window, meteors, map URL |
 | OTHER SIDES OF THE CITY | Same shape, one place per side, not the user’s side |
-| WINDOW CONDITIONS | Temp min/max °C, wind km/h, rain mm, humidity %, cloud %, dress hint |
-| PRACTICAL TIPS FOR A MEMORABLE NIGHT | The weather-aware packing list |
+| WINDOW CONDITIONS AT YOUR PLACE | Temp min/max °C, wind, rain, humidity, cloud, dress hint for the user's window |
+| PRACTICAL TIPS AT YOUR PLACE | Packing list for the user's pin |
+| WINDOW CONDITIONS AT NEAR YOU | Same weather fields from the park's own forecast |
+| NATURE NOTE | Optional: grass often feels colder/damper than the street |
+| PRACTICAL TIPS AT NEAR YOU | Packing list for that park |
 
-WINDOW CONDITIONS come from the **same hourly rows** as the suggested viewing time, not a daily average.
+WINDOW CONDITIONS AT YOUR PLACE come from the **same hourly rows** as the suggested viewing time at the user's pin. WINDOW CONDITIONS AT NEAR YOU come from a **second** Open-Meteo download at that park.
 
 ## Message list sent to Grok
 
@@ -117,10 +122,10 @@ Grok never receives raw weather DataFrames or `showers.json`. It only sees this 
 
 | Button | What happens |
 | --- | --- |
-| How cold? What to wear? | Sent to Grok; should use WINDOW CONDITIONS |
+| How cold? What to wear? | Sent to Grok; should cover YOUR PLACE then NEAR YOU |
 | Will it be windy? | Sent to Grok |
 | Will it rain? | Sent to Grok |
-| Practical tips for a memorable night | Python packing list |
+| Practical tips for a memorable night | Python packing list(s) |
 
 Typed questions in the chat box go to Grok, except the exact practical-tips sentence above.
 

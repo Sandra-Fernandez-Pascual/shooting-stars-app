@@ -4,8 +4,7 @@ A little night-sky companion that finds the best hour to watch shooting stars fr
 
 [![Live App](https://img.shields.io/badge/Live_App-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://shooting-stars.streamlit.app/)
 [![Project Planning](https://img.shields.io/badge/Project_Planning-0052CC?style=for-the-badge&logo=trello&logoColor=white)](https://trello.com/b/hWIYxGgN/shooting-stars-bot)
-
-🎤 **Final Presentation:**
+[![Final Presentation](https://img.shields.io/badge/Final_Presentation-00C4CC?style=for-the-badge&logo=canva&logoColor=white)](https://www.canva.com/design/DAHS6aFI8Kg/yypa5wGGLWUUzkMcDAlNQg/view)
 
 ## How to use it
 

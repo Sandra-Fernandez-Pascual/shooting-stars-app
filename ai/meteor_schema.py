@@ -8,6 +8,8 @@ import json
 import os
 from datetime import date
 
+import streamlit as st
+
 
 SHOWERS_PATH = os.path.join(
     os.path.dirname(os.path.dirname(__file__)),
@@ -16,6 +18,7 @@ SHOWERS_PATH = os.path.join(
 )
 
 
+@st.cache_resource
 def load_showers():
     """Read showers.json and return a list of shower dictionaries.
 

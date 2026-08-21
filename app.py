@@ -8,7 +8,11 @@ import streamlit as st
 from html import escape
 
 from ai.agent import agent
-from ai.prompts import SYSTEM_PROMPT, format_practical_tips, format_results_context
+from ai.prompts import (
+    SYSTEM_PROMPT,
+    format_results_context,
+    format_tips_for_results,
+)
 from ai.theme import BOT_AVATAR, USER_AVATAR, apply_starry_theme
 from ai.tools import run_pipeline
 from ai.utils import (
@@ -18,6 +22,40 @@ from ai.utils import (
     SKY_QUALITY_OPTIONS,
     forecast_dates,
 )
+
+NEAR_YOU_WORTH_IT = 20
+
+
+def _near_you_worth_it(close):
+    """True if the darker nearby spot has enough meteors to bother going."""
+    return close is not None and (close.get("expected_meteors") or 0) >= NEAR_YOU_WORTH_IT
+
+
+def _show_near_you(close):
+    """The Near you card: named darker place, distance, window, map."""
+    window_bit = ""
+    if close.get("window_local"):
+        window_bit = ", " + str(close["window_local"])
+    sector_bit = ""
+    if close.get("sector"):
+        sector_bit = ", " + str(close["sector"])
+    st.markdown(
+        '<div class="near-you"><strong>Near you</strong> · '
+        + escape(str(close["name"]))
+        + " ("
+        + str(close["distance_km"])
+        + " km"
+        + escape(sector_bit)
+        + escape(window_bit)
+        + ", about "
+        + escape(str(close["expected_meteors_display"]))
+        + " meteors on "
+        + escape(str(close["date_label"]))
+        + ").</div>",
+        unsafe_allow_html=True,
+    )
+    if close.get("maps_url"):
+        st.markdown("[Open map](" + close["maps_url"] + ")")
 
 st.set_page_config(
     page_title="Shooting Stars Bot",
@@ -59,11 +97,17 @@ city_part = st.selectbox(
     help=CITY_PART_HELP,
 )
 
+st.caption(
+    "A search can take about a minute while the sky math runs. "
+    "That is normal — the app is working, not stuck."
+)
 if st.button("Find best viewing time", type="primary"):
     if not city or city.strip() == "":
         st.error("Please enter a city.")
     else:
-        with st.spinner("Calculating the viewing forecast..."):
+        with st.spinner(
+            "Calculating the viewing forecast… this can take about a minute."
+        ):
             results = run_pipeline(
                 city.strip(), selected_date, sky_quality, city_part
             )
@@ -88,21 +132,71 @@ if st.button("Find best viewing time", type="primary"):
             st.session_state["messages"] = []
         else:
             st.session_state["results"] = results
-            context = format_results_context(results)
-            greeting = (
-                "The sky is booked. You just have to show up a little "
-                "curious, a little bundled, and ready for a streak of light. "
-                "If you want a hand getting cozy, those sparkles above "
-                "are already waiting. ✨"
-            )
-            st.session_state["messages"] = [
-                {"role": "system", "content": SYSTEM_PROMPT + "\n\n" + context},
-                {"role": "assistant", "content": greeting},
-            ]
+            close = results.get("close_location_recommendation")
+            no_meteors = (results.get("expected_meteors") or 0) <= 0
+            if no_meteors and not _near_you_worth_it(close):
+                st.session_state["messages"] = []
+            else:
+                context = format_results_context(results)
+                if no_meteors:
+                    greeting = (
+                        "Your street looks quiet tonight. The darker spot "
+                        "below is the better bet. If you want a hand packing "
+                        "for that one, those sparkles above are waiting. ✨"
+                    )
+                else:
+                    greeting = (
+                        "The sky is booked. You just have to show up a little "
+                        "curious, a little bundled, and ready for a streak of light. "
+                        "If you want a hand getting cozy, those sparkles above "
+                        "are already waiting. ✨"
+                    )
+                st.session_state["messages"] = [
+                    {"role": "system", "content": SYSTEM_PROMPT + "\n\n" + context},
+                    {"role": "assistant", "content": greeting},
+                ]
 
 results = st.session_state.get("results")
 
-if results and results.get("ok"):
+if results and results.get("ok") and (results.get("expected_meteors") or 0) <= 0:
+    close = results.get("close_location_recommendation")
+    if _near_you_worth_it(close):
+        st.warning(
+            "This night does not look good for shooting stars at "
+            + str(results["resolved_location"])
+            + " on "
+            + str(results["selected_date_label"])
+            + ". A darker spot nearby looks much better — see **Near you** below."
+        )
+        _show_near_you(close)
+    else:
+        st.warning(
+            "This night does not look good for shooting stars at "
+            + str(results["resolved_location"])
+            + " on "
+            + str(results["selected_date_label"])
+            + ". Try another date in the next 14 days, or a darker place."
+        )
+    other_nights = results.get("other_nights") or []
+    better_nights = []
+    for item in other_nights:
+        if item.get("expected_meteors_display") and item["expected_meteors_display"] != "0":
+            better_nights.append(item)
+    if better_nights:
+        st.caption("Other nights at this place that look better:")
+        for item in better_nights:
+            shower_bit = item["shower"] or "no major shower"
+            st.write(
+                "**"
+                + item["date_label"]
+                + ":** about "
+                + item["expected_meteors_display"]
+                + " meteors ("
+                + shower_bit
+                + ")."
+            )
+
+if results and results.get("ok") and (results.get("expected_meteors") or 0) > 0:
     st.subheader("Viewing forecast")
     st.write("**Location:** " + results["resolved_location"])
     st.write("**Date:** " + results["selected_date_label"])
@@ -167,31 +261,12 @@ if results and results.get("ok"):
 
     close = results.get("close_location_recommendation")
     if close:
-        window_bit = ""
-        if close.get("window_local"):
-            window_bit = ", " + str(close["window_local"])
-        sector_bit = ""
-        if close.get("sector"):
-            sector_bit = ", " + str(close["sector"])
-        st.markdown(
-            '<div class="near-you"><strong>Near you</strong> · '
-            + escape(str(close["name"]))
-            + " ("
-            + str(close["distance_km"])
-            + " km"
-            + escape(sector_bit)
-            + escape(window_bit)
-            + ", about "
-            + escape(str(close["expected_meteors_display"]))
-            + " meteors on "
-            + escape(str(close["date_label"]))
-            + ").</div>",
-            unsafe_allow_html=True,
-        )
-        if close.get("maps_url"):
-            st.markdown("[Open map](" + close["maps_url"] + ")")
+        _show_near_you(close)
 
-    around = results.get("around_city_recommendations") or []
+    around = []
+    for item in results.get("around_city_recommendations") or []:
+        if (item.get("expected_meteors") or 0) >= NEAR_YOU_WORTH_IT:
+            around.append(item)
     if around:
         st.subheader("Other sides of the city")
         st.caption(
@@ -235,13 +310,17 @@ if results and results.get("ok"):
             + " meteors)."
         )
 
+if results and results.get("ok") and (
+    (results.get("expected_meteors") or 0) > 0
+    or _near_you_worth_it(results.get("close_location_recommendation"))
+):
     pending = st.session_state.pop("pending_chat", None)
     if pending:
         st.session_state["messages"].append(
             {"role": "user", "content": pending}
         )
         if pending == "Practical tips for a memorable night":
-            reply = format_practical_tips(results.get("comfort_conditions"))
+            reply = format_tips_for_results(results)
         else:
             reply = agent(st.session_state["messages"])
         st.session_state["messages"].append(
@@ -260,6 +339,8 @@ if results and results.get("ok"):
             "(and **what to wear** so you last until the good streak), "
             "whether the **wind** will make itself known, "
             "a **rain** check, or **practical tips for a memorable night**. "
+            "If there is a Near you spot, answers cover **your place** and "
+            "**that park** separately. "
             "Pick a sparkle. 🌟"
         )
         row1a, row1b = st.columns(2)
