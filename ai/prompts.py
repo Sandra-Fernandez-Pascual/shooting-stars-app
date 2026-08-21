@@ -13,19 +13,22 @@ or location. If asked about dates or places, say that is already on the page.
 Your job is extra help only: temperature, wind, rain, humidity, what to
 wear, and practical viewing tips. Never invent weather numbers.
 
-If NEAR YOU is present, always answer in two short parts and keep them
-apart:
-1. YOUR PLACE — use WINDOW CONDITIONS AT YOUR PLACE (and PRACTICAL TIPS
-   AT YOUR PLACE if they asked for tips).
-2. NEAR YOU — name that place, then use WINDOW CONDITIONS AT NEAR YOU
-   (and PRACTICAL TIPS AT NEAR YOU if they asked for tips).
+If NEAR YOU is present, answer weather questions (cold, wind, rain) in
+two short parts and keep them apart:
+1. YOUR PLACE — use WINDOW CONDITIONS AT YOUR PLACE.
+2. NEAR YOU — name that place, then use WINDOW CONDITIONS AT NEAR YOU.
 If a NATURE NOTE is given, you may say sitting in a park or reserve often
 feels colder and damper than town; do not change the temperature numbers.
 
 If NEAR YOU is none, only use the YOUR PLACE blocks.
 
-If they ask for practical tips, use the matching PRACTICAL TIPS text
-exactly; do not add extra rules.
+If they ask for practical tips and NEAR YOU is present, do not paste both
+packing lists. Ask which spot they want tips for (where they will watch
+from, or the Near you place). When they have chosen, use only that
+PRACTICAL TIPS block, exactly; do not add extra rules.
+
+If they ask for practical tips and NEAR YOU is none, use PRACTICAL TIPS
+AT YOUR PLACE exactly.
 
 Explain weather answers in short, plain English (usually 2 to 4 sentences
 per place).
@@ -175,15 +178,19 @@ def format_practical_tips(comfort=None, heading=None, in_nature=False):
     return body
 
 
-def format_tips_for_results(results):
-    """Packing list for your place, plus Near you when that card exists."""
-    your = format_practical_tips(
+def format_tips_your_place(results):
+    """Packing list for the user's pin only."""
+    return format_practical_tips(
         results.get("comfort_conditions"),
         heading="Where you will watch from",
     )
+
+
+def format_tips_near_you(results):
+    """Packing list for the Near you place only."""
     close = results.get("close_location_recommendation")
     if not close:
-        return your
+        return format_tips_your_place(results)
     near_heading = (
         "Near you · "
         + str(close.get("name"))
@@ -191,12 +198,25 @@ def format_tips_for_results(results):
         + str(close.get("kind"))
         + ")"
     )
-    near = format_practical_tips(
+    return format_practical_tips(
         close.get("comfort_conditions"),
         heading=near_heading,
         in_nature=is_nature_site(close),
     )
-    return your + "\n\n" + near
+
+
+def ask_which_tips_place(results):
+    """Ask which packing list to show when Near you exists."""
+    close = results.get("close_location_recommendation")
+    name = "the darker spot nearby"
+    if close and close.get("name"):
+        name = str(close["name"])
+    return (
+        "Practical tips for which spot — **where you will watch from**, "
+        "or **Near you** ("
+        + name
+        + ")?"
+    )
 
 
 def _place_context_line(spot, prefix):

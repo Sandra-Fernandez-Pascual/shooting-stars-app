@@ -17,8 +17,10 @@ st.set_page_config(
 from ai.agent import agent
 from ai.prompts import (
     SYSTEM_PROMPT,
+    ask_which_tips_place,
     format_results_context,
-    format_tips_for_results,
+    format_tips_near_you,
+    format_tips_your_place,
 )
 from ai.theme import BOT_AVATAR, USER_AVATAR, apply_starry_theme
 from ai.tools import run_pipeline
@@ -88,6 +90,8 @@ if "results" not in st.session_state:
     st.session_state["results"] = None
 if "messages" not in st.session_state:
     st.session_state["messages"] = []
+if "awaiting_tips_location" not in st.session_state:
+    st.session_state["awaiting_tips_location"] = False
 
 dates = forecast_dates()
 min_date = dates[0]
@@ -145,18 +149,21 @@ if st.button("Find best viewing time", type="primary"):
                 st.error("Something went wrong. Please try again.")
             st.session_state["results"] = None
             st.session_state["messages"] = []
+            st.session_state["awaiting_tips_location"] = False
         else:
             st.session_state["results"] = results
+            st.session_state["awaiting_tips_location"] = False
             close = results.get("close_location_recommendation")
             weak_night = not _main_worth_it(results)
             if weak_night and not _near_you_worth_it(close):
                 st.session_state["messages"] = []
+                st.session_state["awaiting_tips_location"] = False
             else:
                 context = format_results_context(results)
                 if weak_night:
                     greeting = (
                         "Your street looks quiet tonight. The darker spot "
-                        "below is the better bet. If you want a hand packing "
+                        "above is the better bet. If you want a hand packing "
                         "for that one, those sparkles above are waiting. ✨"
                     )
                 else:
@@ -200,7 +207,7 @@ if results and results.get("ok") and not _main_worth_it(results):
             + str(results["selected_date_label"])
             + "."
             + lights
-            + " Try another date in the next 14 days, or search a different city."
+            + " Try another date in the next 14 days, or try a different location."
         )
     better_nights = _nights_worth_showing(results.get("other_nights"))
     if better_nights:
@@ -340,8 +347,35 @@ if results and results.get("ok") and (
         st.session_state["messages"].append(
             {"role": "user", "content": pending}
         )
-        if pending == "Practical tips for a memorable night":
-            reply = format_tips_for_results(results)
+        close = results.get("close_location_recommendation")
+        if pending == "Practical tips: where I will watch from":
+            st.session_state["awaiting_tips_location"] = False
+            reply = format_tips_your_place(results)
+        elif pending == "Practical tips: near you":
+            st.session_state["awaiting_tips_location"] = False
+            reply = format_tips_near_you(results)
+        elif pending == "Practical tips for a memorable night":
+            if close:
+                st.session_state["awaiting_tips_location"] = True
+                reply = ask_which_tips_place(results)
+            else:
+                reply = format_tips_your_place(results)
+        elif st.session_state.get("awaiting_tips_location") and close:
+            text = pending.lower()
+            name = str(close.get("name") or "").lower()
+            if "near" in text or (name and name in text):
+                st.session_state["awaiting_tips_location"] = False
+                reply = format_tips_near_you(results)
+            elif (
+                "watch" in text
+                or "street" in text
+                or "my place" in text
+                or "here" in text
+            ):
+                st.session_state["awaiting_tips_location"] = False
+                reply = format_tips_your_place(results)
+            else:
+                reply = ask_which_tips_place(results)
         else:
             reply = agent(st.session_state["messages"])
         st.session_state["messages"].append(
@@ -360,8 +394,6 @@ if results and results.get("ok") and (
             "(and **what to wear** so you last until the good streak), "
             "whether the **wind** will make itself known, "
             "a **rain** check, or **practical tips for a memorable night**. "
-            "If there is a Near you spot, answers cover **your place** and "
-            "**that park** separately. "
             "Pick a sparkle. 🌟"
         )
         row1a, row1b = st.columns(2)
@@ -394,6 +426,18 @@ if results and results.get("ok") and (
             if msg["role"] == "user":
                 avatar = USER_AVATAR
             st.chat_message(msg["role"], avatar=avatar).write(msg["content"])
+
+        close = results.get("close_location_recommendation")
+        if st.session_state.get("awaiting_tips_location") and close:
+            pick1, pick2 = st.columns(2)
+            if pick1.button("Where I will watch from"):
+                st.session_state["pending_chat"] = (
+                    "Practical tips: where I will watch from"
+                )
+                st.rerun()
+            if pick2.button("Near you · " + str(close["name"])):
+                st.session_state["pending_chat"] = "Practical tips: near you"
+                st.rerun()
 
         prompt = st.chat_input("✨ How cold? What to wear? Practical tips?")
         if prompt:

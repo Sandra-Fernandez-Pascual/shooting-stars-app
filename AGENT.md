@@ -34,7 +34,7 @@ A successful search builds `st.session_state["messages"]`:
 A button or `st.chat_input` stores text in `pending_chat`, then Streamlit reruns. On that rerun:
 
 - The user line is appended.
-- If the text is exactly `Practical tips for a memorable night`, Python builds the packing list (`format_tips_for_results`): your place, then Near you when that card exists.
+- If the text is exactly `Practical tips for a memorable night` and Near you exists, Python asks which spot, then shows one packing list. If there is no Near you, it shows the list for the user's place.
 - Otherwise `agent(messages)` is called with the **whole** history (system + greeting + earlier turns + new question).
 
 ## Tools (Python, not Grok)
@@ -67,17 +67,17 @@ All of this text lives in `ai/prompts.py`.
 Grok is a friendly helper for watching shooting stars. It must:
 
 1. Talk only about extra help: temperature, wind, rain, humidity, what to wear, and practical tips.
-2. If **NEAR YOU** exists, answer in two parts: **YOUR PLACE** then **NEAR YOU**, using the matching WINDOW CONDITIONS / PRACTICAL TIPS. Do not mix them.
-3. If someone asks for practical tips, use those PRACTICAL TIPS blocks as written.
+2. If **NEAR YOU** exists, answer weather in two parts: **YOUR PLACE** then **NEAR YOU**, using the matching WINDOW CONDITIONS. Do not mix them.
+3. If someone asks for practical tips and Near you exists, ask which spot, then use only that PRACTICAL TIPS block.
 4. Keep weather answers short (about 2 to 4 sentences per place).
 5. A **NATURE NOTE** means sitting in a park often *feels* colder and damper; Grok must not invent different °C.
 
 ### Practical tips (`format_practical_tips`)
 
-Python writes the packing list from the weather in the viewing window (how cold it is, rain, wind, damp grass, insects). If Near you exists, there are two lists (your place, then that park, with a nature feel note for reserves and forests).
+Python writes the packing list from the weather in the viewing window (how cold it is, rain, wind, damp grass, insects). If Near you exists, the button first asks which spot, then shows one list.
 
 - The **Practical tips** button shows this on the page.
-- The same lists are copied into Grok’s context, so a typed “practical tips” question can match the button.
+- The lists are copied into Grok’s context, so a typed “practical tips” question can match after they pick a spot.
 - If there is no weather block, `PRACTICAL_TIPS_FALLBACK` is used instead.
 
 ## Context packed into the system message
@@ -125,7 +125,7 @@ Grok never receives raw weather DataFrames or `showers.json`. It only sees this 
 | How cold? What to wear? | Sent to Grok; should cover YOUR PLACE then NEAR YOU |
 | Will it be windy? | Sent to Grok |
 | Will it rain? | Sent to Grok |
-| Practical tips for a memorable night | Python packing list(s) |
+| Practical tips for a memorable night | Asks which spot if Near you exists, then one Python packing list |
 
 Typed questions in the chat box go to Grok, except the exact practical-tips sentence above.
 
