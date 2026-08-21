@@ -2,11 +2,56 @@
 
 A little night-sky companion that finds the best hour to watch shooting stars from where you are — then helps you get cozy for the show.
 
-🔗 **Live App:** https://shooting-stars.streamlit.app/
+[![Live App](https://img.shields.io/badge/Live_App-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://shooting-stars.streamlit.app/)
+[![Project Planning](https://img.shields.io/badge/Project_Planning-0052CC?style=for-the-badge&logo=trello&logoColor=white)](https://trello.com/b/hWIYxGgN/shooting-stars-bot)
 
-🎤 **Final Presentation:** 
+🎤 **Final Presentation:**
 
-📋 **Project Planning:** https://trello.com/b/hWIYxGgN/shooting-stars-bot
+## Run the app
+
+1. Clone the repo and create a virtual environment:
+
+```bash
+git clone https://github.com/Sandra-Fernandez-Pascual/shooting-stars-app.git
+cd shooting-stars-app
+python -m venv .venv
+```
+
+2. Activate it:
+
+```bash
+# Windows
+.venv\Scripts\activate
+
+# macOS / Linux
+source .venv/bin/activate
+```
+
+3. Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+4. (Optional) Add an xAI key so chat works. Copy `.streamlit/secrets.toml.example` to `.streamlit/secrets.toml` and paste your key:
+
+```toml
+XAI_API_KEY = "xai-your-key-here"
+```
+
+[![Get xAI key](https://img.shields.io/badge/Get_xAI_key-000000?style=for-the-badge)](https://console.x.ai/)
+
+The viewing forecast still works without a key; only chat needs it. `.streamlit/secrets.toml` is gitignored.
+
+5. Start the app:
+
+```bash
+streamlit run app.py
+```
+
+6. Open the URL Streamlit prints (usually [http://localhost:8501](http://localhost:8501)).
+
+The first forecast can take about 30–60 seconds while Python computes Sun, Moon, and radiant positions for each night hour.
 
 ## Features
 
@@ -17,7 +62,7 @@ A little night-sky companion that finds the best hour to watch shooting stars fr
 - Score from 0–100 compared with the other nights in the forecast
 - Two other nights, a nearby darker place, and other sides of a big city
 - Chat for how cold it will feel, wind, rain, and practical tips for that window
-- Grok chat (`grok-3-mini`) 
+- Grok chat (`grok-3-mini`)
 
 ## How the estimate works
 
@@ -65,6 +110,4 @@ shooting-stars-app/
   README.md
 ```
 
-Code style: functions, dictionaries and pandas. 
-
- 
+Code style: functions, dictionaries and pandas.
