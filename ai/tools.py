@@ -44,33 +44,45 @@ from ai.utils import (
 
 
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
+METNO_URL = "https://api.met.no/weatherapi/locationforecast/2.0/complete"
 
 # Astronomical night starts when the Sun is more than 18 degrees below
 # the horizon. We do not use twilight hours.
 ASTRONOMICAL_NIGHT_LIMIT = -18.0
 
 
-def fetch_weather(latitude, longitude):
-    """Download a 14-day hourly forecast from Open-Meteo.
+def fetch_weather(latitude, longitude, timezone_name=None):
+    """Download an hourly forecast (Open-Meteo, then MET Norway if needed).
 
     Args:
         latitude (float): city latitude.
         longitude (float): city longitude.
+        timezone_name (str, optional): IANA zone from geocoding, used by MET Norway.
 
     Returns:
         pandas.DataFrame: local time, cloud cover (%), visibility (m).
-        None if the request failed.
+        None if both requests failed.
     """
     try:
-        weather = _fetch_weather_cached(latitude, longitude)
+        weather = _fetch_weather_cached(
+            round(float(latitude), 4),
+            round(float(longitude), 4),
+            str(timezone_name or ""),
+        )
         return weather.copy()
-    except (requests.RequestException, ValueError):
+    except (requests.RequestException, ValueError, KeyError, TypeError):
         return None
 
 
-@ttl_cache(3600)
-def _fetch_weather_cached(latitude, longitude):
-    """Cached Open-Meteo forecast. Network and empty replies are not stored."""
+def _zone(timezone_name):
+    try:
+        return ZoneInfo(timezone_name or "UTC")
+    except Exception:
+        return ZoneInfo("UTC")
+
+
+def _weather_from_openmeteo(latitude, longitude):
+    """Open-Meteo 14-day hourly table. Raises if the host is busy or blocked."""
     response = openmeteo_get(
         FORECAST_URL,
         params={
@@ -83,9 +95,12 @@ def _fetch_weather_cached(latitude, longitude):
             "timezone": "auto",
             "forecast_days": 14,
         },
-        timeout=30,
+        timeout=10,
+        retries=1,
     )
     data = response.json()
+    if data.get("error"):
+        raise ValueError(str(data.get("reason") or "Open-Meteo error"))
 
     hourly = data.get("hourly", {})
     times = hourly.get("time", [])
@@ -100,10 +115,7 @@ def _fetch_weather_cached(latitude, longitude):
         raise ValueError("empty hourly forecast")
 
     tz_name = data.get("timezone", "UTC")
-    try:
-        tz = ZoneInfo(tz_name)
-    except Exception:
-        tz = ZoneInfo("UTC")
+    tz = _zone(tz_name)
 
     rows = []
     for i in range(len(times)):
@@ -134,6 +146,69 @@ def _fetch_weather_cached(latitude, longitude):
     weather = pd.DataFrame(rows)
     weather["timezone_name"] = tz_name
     return weather
+
+
+def _weather_from_metno(latitude, longitude, timezone_name):
+    """MET Norway forecast. Used when Open-Meteo will not answer Streamlit Cloud."""
+    response = openmeteo_get(
+        METNO_URL,
+        params={"lat": latitude, "lon": longitude},
+        timeout=20,
+        retries=3,
+    )
+    data = response.json()
+    series = data.get("properties", {}).get("timeseries", [])
+    if not series:
+        raise ValueError("empty MET Norway forecast")
+
+    tz = _zone(timezone_name)
+    rows = []
+    for item in series:
+        utc_time = pd.to_datetime(item.get("time"), utc=True)
+        local_time = utc_time.tz_convert(tz)
+        details = (
+            item.get("data", {}).get("instant", {}).get("details", {}) or {}
+        )
+        next1 = (
+            item.get("data", {}).get("next_1_hours", {}).get("details", {}) or {}
+        )
+        next6 = (
+            item.get("data", {}).get("next_6_hours", {}).get("details", {}) or {}
+        )
+        rain = next1.get("precipitation_amount")
+        if rain is None:
+            rain = next6.get("precipitation_amount")
+        wind_ms = details.get("wind_speed")
+        wind_kmh = None if wind_ms is None else float(wind_ms) * 3.6
+        cloud = details.get("cloud_area_fraction")
+        rows.append(
+            {
+                "time": local_time,
+                "cloud_cover_pct": 100 if cloud is None else cloud,
+                "visibility_m": None,
+                "temperature_c": details.get("air_temperature"),
+                "wind_speed_kmh": wind_kmh,
+                "precipitation_mm": 0 if rain is None else rain,
+                "humidity_pct": details.get("relative_humidity"),
+            }
+        )
+
+    weather = pd.DataFrame(rows)
+    weather = weather.drop_duplicates(subset=["time"]).sort_values("time")
+    weather = weather.set_index("time").resample("1h").ffill().reset_index()
+    weather["timezone_name"] = timezone_name or "UTC"
+    if len(weather) == 0:
+        raise ValueError("empty MET Norway forecast")
+    return weather
+
+
+@ttl_cache(3600)
+def _fetch_weather_cached(latitude, longitude, timezone_name):
+    """Cached forecast. Failures are not stored; MET Norway is the fallback."""
+    try:
+        return _weather_from_openmeteo(latitude, longitude)
+    except Exception:
+        return _weather_from_metno(latitude, longitude, timezone_name)
 
 
 def _altaz_frame(latitude, longitude, when):
@@ -491,11 +566,13 @@ def comfort_conditions(weather, window_start, window_end):
     }
 
 
-def comfort_for_nearby_place(spot):
+def comfort_for_nearby_place(spot, timezone_name=None):
     """Weather in the Near you window, from that place's own forecast."""
     if spot is None:
         return None
-    park_weather = fetch_weather(spot["latitude"], spot["longitude"])
+    park_weather = fetch_weather(
+        spot["latitude"], spot["longitude"], timezone_name
+    )
     return comfort_conditions(
         park_weather, spot.get("window_start"), spot.get("window_end")
     )
@@ -1084,7 +1161,7 @@ def run_pipeline(city_name, selected_date, sky_quality, city_part=None):
         large_city,
     )
 
-    weather = fetch_weather(user_lat, user_lon)
+    weather = fetch_weather(user_lat, user_lon, place.get("timezone"))
     if weather is None:
         return {"ok": False, "error": "weather_timeout"}
 
@@ -1154,7 +1231,9 @@ def run_pipeline(city_name, selected_date, sky_quality, city_part=None):
         weather, selected.get("window_start"), selected.get("window_end")
     )
     if close_place is not None:
-        close_place["comfort_conditions"] = comfort_for_nearby_place(close_place)
+        close_place["comfort_conditions"] = comfort_for_nearby_place(
+            close_place, place.get("timezone")
+        )
         close_place.pop("window_start", None)
         close_place.pop("window_end", None)
 

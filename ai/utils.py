@@ -16,19 +16,15 @@ GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search"
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 OSM_USER_AGENT = "ShootingStarsBot/1.0 (Ironhack student project)"
-OPENMETEO_USER_AGENT = (
-    "ShootingStarsBot/1.0 (https://shooting-stars.streamlit.app/)"
+WEATHER_USER_AGENT = (
+    "ShootingStarsBot/1.0 (https://github.com/Sandra-Fernandez-Pascual/shooting-stars-app)"
 )
 
 
 def openmeteo_get(url, params, timeout=30, retries=4):
-    """GET Open-Meteo with a real User-Agent and retries on 429/5xx.
-
-    Streamlit Cloud shares IPs, so the free API often answers 'too many
-    concurrent requests' on the first try.
-    """
+    """GET a weather API with a real User-Agent and retries on 429/5xx."""
     headers = {
-        "User-Agent": OPENMETEO_USER_AGENT,
+        "User-Agent": WEATHER_USER_AGENT,
         "Accept": "application/json",
     }
     last_error = None
@@ -39,7 +35,7 @@ def openmeteo_get(url, params, timeout=30, retries=4):
             )
             if response.status_code in (429, 502, 503, 504):
                 last_error = requests.HTTPError(
-                    "Open-Meteo HTTP " + str(response.status_code)
+                    "Weather HTTP " + str(response.status_code)
                 )
                 time.sleep(1.5 * (attempt + 1))
                 continue
@@ -50,7 +46,7 @@ def openmeteo_get(url, params, timeout=30, retries=4):
             time.sleep(1.5 * (attempt + 1))
     if last_error is not None:
         raise last_error
-    raise requests.RequestException("Open-Meteo request failed")
+    raise requests.RequestException("Weather request failed")
 
 # How far we look for a darker viewing spot, in km.
 DARK_SITE_MIN_KM = 5
