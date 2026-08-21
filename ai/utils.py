@@ -5,6 +5,7 @@ These functions are used by tools.py and by the Streamlit apps.
 
 import math
 import time
+import unicodedata
 from datetime import date, timedelta
 
 import requests
@@ -126,6 +127,69 @@ SCORE_EXPLANATION = (
 )
 
 
+def _fold_text(value):
+    """Lowercase without accents, for matching Spain / España."""
+    text = unicodedata.normalize("NFD", str(value or ""))
+    return "".join(c for c in text if unicodedata.category(c) != "Mn").lower()
+
+
+_PLACE_FILLER = {"from", "in", "de", "del", "of"}
+_COUNTRY_ALIASES = {
+    "espana": "spain",
+    "uk": "united kingdom",
+    "usa": "united states",
+    "us": "united states",
+}
+
+
+def _parse_place_query(city_name):
+    """Split 'Córdoba, Spain' or 'Cordoba Spain' into name and country hint."""
+    raw = " ".join(str(city_name).strip().split())
+    if not raw:
+        return "", ""
+    if "," in raw:
+        left, right = raw.split(",", 1)
+        return left.strip(), right.strip()
+    parts = [p for p in raw.split() if p.lower() not in _PLACE_FILLER]
+    if len(parts) >= 2:
+        return " ".join(parts[:-1]), parts[-1]
+    return raw, ""
+
+
+def _country_matches(row, country_hint):
+    if not country_hint:
+        return True
+    hint = _COUNTRY_ALIASES.get(_fold_text(country_hint), _fold_text(country_hint))
+    country = _fold_text(row.get("country"))
+    code = _fold_text(row.get("country_code"))
+    country = _COUNTRY_ALIASES.get(country, country)
+    return hint in country or hint == code or country.startswith(hint)
+
+
+def _pick_geocode_result(results, country_hint):
+    """Prefer a real town in the named country; skip airports when we can."""
+    if not results:
+        return None
+    matched = [row for row in results if _country_matches(row, country_hint)]
+    if not matched:
+        return None
+    towns = [
+        row
+        for row in matched
+        if not str(row.get("feature_code") or "").startswith("AIR")
+    ]
+    pool = towns or matched
+    if country_hint:
+        def population(row):
+            value = row.get("population")
+            if value is None:
+                return 0
+            return int(value)
+
+        pool = sorted(pool, key=population, reverse=True)
+    return pool[0]
+
+
 def geocode_city(city_name):
     """Look up a city name with the Open-Meteo geocoding API.
 
@@ -148,18 +212,29 @@ def geocode_city(city_name):
 @ttl_cache(86400)
 def _geocode_city_cached(city_name):
     """Cached Open-Meteo lookup. Network errors are not stored."""
-    response = openmeteo_get(
-        GEOCODING_URL,
-        params={"name": city_name.strip(), "count": 1},
-        timeout=20,
-    )
-    data = response.json()
-
-    results = data.get("results")
-    if not results:
+    raw = " ".join(str(city_name).strip().split())
+    if not raw:
         return None
+    if "," in raw:
+        name_query, country_hint = _parse_place_query(raw)
+    else:
+        name_query, country_hint = raw, ""
 
-    first = results[0]
+    def lookup(name, hint):
+        response = openmeteo_get(
+            GEOCODING_URL,
+            params={"name": name, "count": 8},
+            timeout=20,
+        )
+        return _pick_geocode_result(response.json().get("results") or [], hint)
+
+    first = lookup(name_query, country_hint)
+    if first is None and "," not in raw:
+        name2, hint2 = _parse_place_query(raw)
+        if hint2 and name2 != name_query:
+            first = lookup(name2, hint2)
+    if first is None:
+        return None
     country = first.get("country", "")
     name = first.get("name", city_name)
     if country:

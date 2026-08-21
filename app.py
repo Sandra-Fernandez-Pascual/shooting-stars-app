@@ -271,8 +271,9 @@ if st.button("Find best viewing time", type="primary"):
                 if weak_night:
                     greeting = (
                         "Your street looks quiet tonight. The darker spot "
-                        "above is the better bet. If you want a hand packing "
-                        "for that one, those sparkles above are waiting. ✨"
+                        "above is the better bet. If you want what to wear, "
+                        "the weather there, or a hand packing for that one, "
+                        "those sparkles above are waiting. ✨"
                     )
                 else:
                     greeting = (
@@ -358,11 +359,17 @@ if results and results.get("ok") and _main_worth_it(results):
 
     other_nights = _nights_worth_showing(results.get("other_nights"))
     if other_nights:
-        st.subheader("Two other nights")
+        st.subheader(
+            "Another night" if len(other_nights) == 1 else "Other nights"
+        )
         if results.get("score") == 100:
             st.caption(
                 "Your date is already the strongest of the next 14 days. "
-                "These are the next-best nights at the same place."
+                + (
+                    "This is the next-best night at the same place."
+                    if len(other_nights) == 1
+                    else "These are the next-best nights at the same place."
+                )
             )
         for item in other_nights:
             shower_bit = item["shower"] or "no major shower"
