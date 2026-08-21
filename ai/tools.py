@@ -710,7 +710,7 @@ def why_night_is_weak(
             if near_ok:
                 lines.append(
                     "Lights at this spot hide shooting stars. A darker place "
-                    "nearby still reaches 20 — see Near you below."
+                    "nearby still looks worth going — see Near you below."
                 )
             else:
                 lines.append(
@@ -735,8 +735,7 @@ def why_night_is_weak(
 
     if not lines:
         lines.append(
-            "Fewer than 20 shooting stars are likely in the best three hours. "
-            "Try another date or a different location."
+            "Try another date in the next 14 days, or a different location."
         )
     return lines
 

@@ -292,7 +292,7 @@ if results and results.get("ok") and not _main_worth_it(results):
     close = results.get("close_location_recommendation")
     reasons = results.get("weak_night_reasons") or []
     text = (
-        "This night does not reach 20 shooting stars at "
+        "This night does not look good for shooting stars at "
         + str(results["resolved_location"])
         + " on "
         + str(results["selected_date_label"])
