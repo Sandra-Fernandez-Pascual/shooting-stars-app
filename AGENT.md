@@ -11,8 +11,8 @@ The model is **grok-3-mini** via the OpenAI-compatible xAI API (`ai/agent.py`).
 ## End-to-end flow
 
 1. You pick a city, a date, and where you will watch from.
-2. Python builds the forecast and the page shows it. Chat has not started talking to Grok yet.
-3. If you click **Practical tips**, Python writes the packing list. Grok is not used.
+2. Python builds the forecast and the page shows it.
+3. If you click **Practical tips**, Python writes the packing list.
 4. If you ask about cold, wind, rain, or type a question, Grok answers using the numbers already on the page.
 
 ```mermaid
@@ -34,10 +34,8 @@ A successful search builds `st.session_state["messages"]`:
 A button or `st.chat_input` stores text in `pending_chat`, then Streamlit reruns. On that rerun:
 
 - The user line is appended.
-- If the text is exactly `Practical tips for a memorable night`, Python builds the packing list from `comfort_conditions` (`format_practical_tips`). Grok is skipped.
+- If the text is exactly `Practical tips for a memorable night`, Python builds the packing list from `comfort_conditions` (`format_practical_tips`).
 - Otherwise `agent(messages)` is called with the **whole** history (system + greeting + earlier turns + new question).
-
-The system message is not shown in the chat UI.
 
 ## Tools (Python, not Grok)
 
@@ -61,22 +59,24 @@ These run inside `run_pipeline` **before** chat exists. Grok cannot call them.
 
 ## Prompts
 
-All prompt text lives in `ai/prompts.py`.
+All of this text lives in `ai/prompts.py`.
 
-### System prompt (`SYSTEM_PROMPT`)
+### What Grok is told (`SYSTEM_PROMPT`)
 
-Tells Grok it is a friendly helper, then:
+Grok is a friendly helper for watching shooting stars. It must:
 
-- Extra help: temperature, wind, rain, humidity, what to wear, practical tips.
-- Use **WINDOW CONDITIONS** for weather; never invent numbers.
-- If they ask for practical tips, use **PRACTICAL TIPS FOR A MEMORABLE NIGHT**.
-- Weather answers: usually 2–4 short sentences.
+1. Talk only about extra help: temperature, wind, rain, humidity, what to wear, and practical tips.
+2. Use **WINDOW CONDITIONS** for weather.
+3. If someone asks for practical tips, use **PRACTICAL TIPS FOR A MEMORABLE NIGHT** as written.
+4. Keep weather answers short (about 2 to 4 sentences).
 
-### Practical tips (Python)
+### Practical tips (`format_practical_tips`)
 
-`format_practical_tips(comfort)` builds the packing list from the viewing-window weather (cold vs mild, rain, wind, damp grass, insects). The same text is copied into Grok’s context so a typed “practical tips” question can match the button.
+Python writes the packing list from the weather in the viewing window (how cold it is, rain, wind, damp grass, insects).
 
-If there is no comfort block, `PRACTICAL_TIPS_FALLBACK` is used.
+- The **Practical tips** button shows this list on the page.
+- The same list is copied into Grok’s context, so a typed “practical tips” question can match the button.
+- If there is no weather block, `PRACTICAL_TIPS_FALLBACK` is used instead.
 
 ## Context packed into the system message
 
@@ -120,7 +120,7 @@ Grok never receives raw weather DataFrames or `showers.json`. It only sees this 
 | How cold? What to wear? | Sent to Grok; should use WINDOW CONDITIONS |
 | Will it be windy? | Sent to Grok |
 | Will it rain? | Sent to Grok |
-| Practical tips for a memorable night | Python packing list, no Grok |
+| Practical tips for a memorable night | Python packing list |
 
 Typed questions in the chat box go to Grok, except the exact practical-tips sentence above.
 
