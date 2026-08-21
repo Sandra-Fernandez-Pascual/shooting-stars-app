@@ -28,6 +28,7 @@ from ai.utils import (
     SKY_QUALITY_HELP,
     SKY_QUALITY_OPTIONS,
     forecast_dates,
+    sky_quality_id,
 )
 
 NEAR_YOU_WORTH_IT = 20
@@ -36,6 +37,15 @@ NEAR_YOU_WORTH_IT = 20
 def _near_you_worth_it(close):
     """True if the darker nearby spot has enough meteors to bother going."""
     return close is not None and (close.get("expected_meteors") or 0) >= NEAR_YOU_WORTH_IT
+
+
+def _nights_worth_showing(nights):
+    """Other nights with at least NEAR_YOU_WORTH_IT meteors."""
+    worth = []
+    for item in nights or []:
+        if (item.get("expected_meteors") or 0) >= NEAR_YOU_WORTH_IT:
+            worth.append(item)
+    return worth
 
 
 def _show_near_you(close):
@@ -99,8 +109,7 @@ city_part = st.selectbox(
 )
 
 st.caption(
-    "A search can take about a minute while the sky math runs. "
-    "That is normal — the app is working, not stuck."
+    "A search can take about a minute while the sky math runs."
 )
 if st.button("Find best viewing time", type="primary"):
     if not city or city.strip() == "":
@@ -161,13 +170,21 @@ results = st.session_state.get("results")
 
 if results and results.get("ok") and (results.get("expected_meteors") or 0) <= 0:
     close = results.get("close_location_recommendation")
+    lights = ""
+    if sky_quality_id(results.get("sky_quality")) in ("city", "downtown", "suburb"):
+        lights = (
+            " Light pollution from the city washes out faint shooting stars."
+        )
     if _near_you_worth_it(close):
         st.warning(
             "This night does not look good for shooting stars at "
             + str(results["resolved_location"])
             + " on "
             + str(results["selected_date_label"])
-            + ". A darker spot nearby looks much better — see **Near you** below."
+            + "."
+            + lights
+            + " A darker spot nearby still looks worth it with tonight's "
+            + "weather (about 20 or more meteors) — see **Near you** below."
         )
         _show_near_you(close)
     else:
@@ -176,13 +193,11 @@ if results and results.get("ok") and (results.get("expected_meteors") or 0) <= 0
             + str(results["resolved_location"])
             + " on "
             + str(results["selected_date_label"])
-            + ". Try another date in the next 14 days, or a darker place."
+            + "."
+            + lights
+            + " Try another date in the next 14 days, or search a different city."
         )
-    other_nights = results.get("other_nights") or []
-    better_nights = []
-    for item in other_nights:
-        if item.get("expected_meteors_display") and item["expected_meteors_display"] != "0":
-            better_nights.append(item)
+    better_nights = _nights_worth_showing(results.get("other_nights"))
     if better_nights:
         st.caption("Other nights at this place that look better:")
         for item in better_nights:
@@ -235,7 +250,7 @@ if results and results.get("ok") and (results.get("expected_meteors") or 0) > 0:
 
     st.caption(results["score_explanation"])
 
-    other_nights = results.get("other_nights") or []
+    other_nights = _nights_worth_showing(results.get("other_nights"))
     if other_nights:
         st.subheader("Two other nights")
         if results.get("score") == 100:

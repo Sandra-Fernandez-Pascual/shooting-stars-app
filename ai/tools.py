@@ -683,6 +683,7 @@ def night_summary(item):
         "date_label": format_date_long(item["date"]),
         "shower": item["shower"],
         "window_local": item["window_local"],
+        "expected_meteors": item["expected_meteors"],
         "expected_meteors_display": item["expected_meteors_display"],
         "score": item["score"],
     }
