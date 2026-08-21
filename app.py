@@ -271,9 +271,8 @@ if st.button("Find best viewing time", type="primary"):
                 if weak_night:
                     greeting = (
                         "Your street looks quiet tonight. The darker spot "
-                        "above is the better bet. If you want what to wear, "
-                        "the weather there, or a hand packing for that one, "
-                        "those sparkles above are waiting. ✨"
+                        "above is the better bet. If you want a hand getting "
+                        "cozy, those sparkles above are already waiting. ✨"
                     )
                 else:
                     greeting = (
