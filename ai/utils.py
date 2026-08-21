@@ -4,6 +4,7 @@ These functions are used by tools.py and by the Streamlit apps.
 """
 
 import math
+import time
 from datetime import date, timedelta
 
 import requests
@@ -15,6 +16,41 @@ GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search"
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 OSM_USER_AGENT = "ShootingStarsBot/1.0 (Ironhack student project)"
+OPENMETEO_USER_AGENT = (
+    "ShootingStarsBot/1.0 (https://shooting-stars.streamlit.app/)"
+)
+
+
+def openmeteo_get(url, params, timeout=30, retries=4):
+    """GET Open-Meteo with a real User-Agent and retries on 429/5xx.
+
+    Streamlit Cloud shares IPs, so the free API often answers 'too many
+    concurrent requests' on the first try.
+    """
+    headers = {
+        "User-Agent": OPENMETEO_USER_AGENT,
+        "Accept": "application/json",
+    }
+    last_error = None
+    for attempt in range(retries):
+        try:
+            response = requests.get(
+                url, params=params, headers=headers, timeout=timeout
+            )
+            if response.status_code in (429, 502, 503, 504):
+                last_error = requests.HTTPError(
+                    "Open-Meteo HTTP " + str(response.status_code)
+                )
+                time.sleep(1.5 * (attempt + 1))
+                continue
+            response.raise_for_status()
+            return response
+        except requests.RequestException as err:
+            last_error = err
+            time.sleep(1.5 * (attempt + 1))
+    if last_error is not None:
+        raise last_error
+    raise requests.RequestException("Open-Meteo request failed")
 
 # How far we look for a darker viewing spot, in km.
 DARK_SITE_MIN_KM = 5
@@ -107,12 +143,11 @@ def geocode_city(city_name):
 @ttl_cache(86400)
 def _geocode_city_cached(city_name):
     """Cached Open-Meteo lookup. Network errors are not stored."""
-    response = requests.get(
+    response = openmeteo_get(
         GEOCODING_URL,
         params={"name": city_name.strip(), "count": 1},
         timeout=20,
     )
-    response.raise_for_status()
     data = response.json()
 
     results = data.get("results")

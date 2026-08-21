@@ -35,6 +35,7 @@ from ai.utils import (
     haversine_km,
     is_large_city,
     meteor_range_display,
+    openmeteo_get,
     sky_label_for_id,
     sky_quality_id,
     sky_quality_info,
@@ -70,7 +71,7 @@ def fetch_weather(latitude, longitude):
 @ttl_cache(3600)
 def _fetch_weather_cached(latitude, longitude):
     """Cached Open-Meteo forecast. Network and empty replies are not stored."""
-    response = requests.get(
+    response = openmeteo_get(
         FORECAST_URL,
         params={
             "latitude": latitude,
@@ -84,7 +85,6 @@ def _fetch_weather_cached(latitude, longitude):
         },
         timeout=30,
     )
-    response.raise_for_status()
     data = response.json()
 
     hourly = data.get("hourly", {})
@@ -109,7 +109,10 @@ def _fetch_weather_cached(latitude, longitude):
     for i in range(len(times)):
         local_time = pd.to_datetime(times[i])
         if local_time.tzinfo is None:
-            local_time = local_time.tz_localize(tz)
+            try:
+                local_time = local_time.tz_localize(tz)
+            except (ValueError, TypeError):
+                local_time = local_time.tz_localize("UTC")
         cloud = clouds[i] if i < len(clouds) and clouds[i] is not None else 100
         vis = visibility[i] if i < len(visibility) else None
         temp = temperatures[i] if i < len(temperatures) else None
