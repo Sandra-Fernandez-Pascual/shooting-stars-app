@@ -7,6 +7,13 @@ viewing time. Grok only explains those numbers in the chat below.
 import streamlit as st
 from html import escape
 
+st.set_page_config(
+    page_title="Shooting Stars Bot",
+    page_icon="✨",
+    layout="centered",
+    initial_sidebar_state="collapsed",
+)
+
 from ai.agent import agent
 from ai.prompts import (
     SYSTEM_PROMPT,
@@ -57,12 +64,6 @@ def _show_near_you(close):
     if close.get("maps_url"):
         st.markdown("[Open map](" + close["maps_url"] + ")")
 
-st.set_page_config(
-    page_title="Shooting Stars Bot",
-    page_icon="✨",
-    layout="centered",
-    initial_sidebar_state="collapsed",
-)
 apply_starry_theme()
 
 st.title("Shooting Stars Bot")

@@ -10,7 +10,6 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 import requests
-import streamlit as st
 from astropy.coordinates import AltAz, EarthLocation, SkyCoord, get_body, get_sun
 from astropy.time import Time
 from astropy.utils.iers import conf as iers_conf
@@ -20,6 +19,7 @@ from astroplan import moon_illumination
 # Do not fail if the leap-second table is a little out of date.
 iers_conf.auto_max_age = None
 
+from ai.cache import ttl_cache
 from ai.meteor_schema import days_from_peak, find_active_shower, load_showers
 from ai.utils import (
     CITY_PART_CENTRE,
@@ -61,12 +61,13 @@ def fetch_weather(latitude, longitude):
         None if the request failed.
     """
     try:
-        return _fetch_weather_cached(latitude, longitude)
+        weather = _fetch_weather_cached(latitude, longitude)
+        return weather.copy()
     except (requests.RequestException, ValueError):
         return None
 
 
-@st.cache_data(ttl=3600)
+@ttl_cache(3600)
 def _fetch_weather_cached(latitude, longitude):
     """Cached Open-Meteo forecast. Network and empty replies are not stored."""
     response = requests.get(

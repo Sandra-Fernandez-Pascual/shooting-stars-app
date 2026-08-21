@@ -7,7 +7,8 @@ import math
 from datetime import date, timedelta
 
 import requests
-import streamlit as st
+
+from ai.cache import ttl_cache
 
 
 GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search"
@@ -103,7 +104,7 @@ def geocode_city(city_name):
         return None
 
 
-@st.cache_data(ttl=86400)
+@ttl_cache(86400)
 def _geocode_city_cached(city_name):
     """Cached Open-Meteo lookup. Network errors are not stored."""
     response = requests.get(
@@ -573,7 +574,7 @@ def _unique_sites(candidates):
     return unique
 
 
-@st.cache_data(ttl=43200)
+@ttl_cache(43200)
 def find_nearby_dark_sites(
     latitude, longitude, city_name, country_code="", limit=3, min_gap_km=8
 ):

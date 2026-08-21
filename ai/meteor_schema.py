@@ -7,8 +7,7 @@ radiant coordinates, ZHR, population index r, and sigma_days.
 import json
 import os
 from datetime import date
-
-import streamlit as st
+from functools import lru_cache
 
 
 SHOWERS_PATH = os.path.join(
@@ -18,7 +17,7 @@ SHOWERS_PATH = os.path.join(
 )
 
 
-@st.cache_resource
+@lru_cache(maxsize=1)
 def load_showers():
     """Read showers.json and return a list of shower dictionaries.
 
