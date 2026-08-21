@@ -7,51 +7,18 @@ A little night-sky companion that finds the best hour to watch shooting stars fr
 
 🎤 **Final Presentation:**
 
-## Run the app
+## How to use it
 
-1. Clone the repo and create a virtual environment:
+Open the [live app](https://shooting-stars.streamlit.app/), then:
 
-```bash
-git clone https://github.com/Sandra-Fernandez-Pascual/shooting-stars-app.git
-cd shooting-stars-app
-python -m venv .venv
-```
+1. Enter a city.
+2. Pick a date in the next 14 days.
+3. Say how dark your sky is. In a big city, you can also pick a side of town.
+4. Click **Find best viewing time**.
+5. Read your forecast: best hour, estimated meteors, other nights, and darker spots nearby.
+6. Ask the chat about clothing, wind, rain, or practical tips for that night.
 
-2. Activate it:
-
-```bash
-# Windows
-.venv\Scripts\activate
-
-# macOS / Linux
-source .venv/bin/activate
-```
-
-3. Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-4. (Optional) Add an xAI key so chat works. Copy `.streamlit/secrets.toml.example` to `.streamlit/secrets.toml` and paste your key:
-
-```toml
-XAI_API_KEY = "xai-your-key-here"
-```
-
-[![Get xAI key](https://img.shields.io/badge/Get_xAI_key-000000?style=for-the-badge)](https://console.x.ai/)
-
-The viewing forecast still works without a key; only chat needs it. `.streamlit/secrets.toml` is gitignored.
-
-5. Start the app:
-
-```bash
-streamlit run app.py
-```
-
-6. Open the URL Streamlit prints (usually [http://localhost:8501](http://localhost:8501)).
-
-The first forecast can take about 30–60 seconds while Python computes Sun, Moon, and radiant positions for each night hour.
+The first search can take about 30–60 seconds.
 
 ## Features
 
